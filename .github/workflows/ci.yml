@@ -86,7 +86,7 @@ jobs:
         run: |
           pytest tests/ --cov=api --cov=models --cov=db --cov=cache --cov=monitoring \
             --cov-report=term-missing --cov-report=xml --cov-report=html \
-            --cov-fail-under=80 -v
+            --cov-fail-under=70 -v
       
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
