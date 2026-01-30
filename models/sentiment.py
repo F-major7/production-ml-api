@@ -3,6 +3,8 @@ Sentiment Analysis Model Wrapper
 Supports multiple model versions for A/B testing
 """
 from typing import Dict, Optional
+import os
+import torch
 from transformers import pipeline
 import logging
 
@@ -17,6 +19,7 @@ class SentimentModel:
     Uses DistilBERT fine-tuned on SST-2 for sentiment classification.
     """
     _instances: Dict[str, 'SentimentModel'] = {}
+    _threads_configured: bool = False
     
     def __init__(self, version: str = "v1"):
         """
@@ -54,6 +57,10 @@ class SentimentModel:
         """
         if self._pipeline is None:
             try:
+                self._configure_torch_threads()
+                if os.getenv("DISABLE_MKLDNN") == "1":
+                    torch.backends.mkldnn.enabled = False
+                    logger.info("MKLDNN disabled via DISABLE_MKLDNN=1")
                 logger.info(f"Loading sentiment analysis model (version: {self.version})...")
                 self._pipeline = pipeline(
                     "sentiment-analysis",
@@ -63,6 +70,23 @@ class SentimentModel:
             except Exception as e:
                 logger.error(f"Failed to load model {self.version}: {e}")
                 raise RuntimeError(f"Model initialization failed: {e}")
+
+    @classmethod
+    def _configure_torch_threads(cls) -> None:
+        if cls._threads_configured:
+            return
+        num_threads = os.getenv("TORCH_NUM_THREADS")
+        interop_threads = os.getenv("TORCH_NUM_INTEROP_THREADS")
+        try:
+            if num_threads:
+                torch.set_num_threads(int(num_threads))
+                logger.info(f"Torch num_threads set to {num_threads}")
+            if interop_threads:
+                torch.set_num_interop_threads(int(interop_threads))
+                logger.info(f"Torch num_interop_threads set to {interop_threads}")
+        except ValueError as exc:
+            logger.warning(f"Invalid torch thread settings: {exc}")
+        cls._threads_configured = True
     
     def predict(self, text: str) -> Dict[str, any]:
         """
@@ -86,7 +110,8 @@ class SentimentModel:
         
         try:
             # Pipeline returns list with single result for single input
-            result = self._pipeline(text)[0]
+            with torch.inference_mode():
+                result = self._pipeline(text)[0]
             return {
                 "label": result["label"],
                 "score": result["score"]

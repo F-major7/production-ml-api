@@ -22,7 +22,7 @@ def get_model() -> SentimentModel:
         HTTPException: If model fails to load
     """
     try:
-        model = SentimentModel()
+        model = SentimentModel.get_model()
         if not model.is_loaded:
             logger.error("Model is not loaded")
             raise HTTPException(

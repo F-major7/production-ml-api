@@ -10,6 +10,11 @@ services:
       DATABASE_URL: postgresql+asyncpg://mlapi_user:mlapi_password@postgres:5432/mlapi
       REDIS_URL: redis://redis:6379/0
       LOG_LEVEL: INFO
+      DISABLE_MKLDNN: "1"
+      OMP_NUM_THREADS: "4"
+      MKL_NUM_THREADS: "4"
+      TORCH_NUM_THREADS: "4"
+      TORCH_NUM_INTEROP_THREADS: "1"
     ports:
       - "8000:8000"
     depends_on:
@@ -97,6 +102,8 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana-datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
+      - ./monitoring/grafana-dashboard.yml:/etc/grafana/provisioning/dashboards/dashboard.yml
+      - ./monitoring/grafana-dashboard.json:/var/lib/grafana/dashboards/grafana-dashboard.json
     depends_on:
       prometheus:
         condition: service_healthy

@@ -116,7 +116,7 @@ async def health_check(
     
     try:
         # Check model
-        model = SentimentModel()
+        model = SentimentModel.get_model()
         health_status["model_loaded"] = model.is_loaded
         if not model.is_loaded:
             is_healthy = False
@@ -776,9 +776,11 @@ async def startup_event():
     """Initialize model and database on startup"""
     logger.info("Starting Production ML API...")
     try:
-        # Load ML model
-        model = SentimentModel()
-        logger.info(f"Model loaded: {model.is_loaded}")
+        # Load ML models (v1 and v2) for A/B testing readiness
+        model_v1 = SentimentModel.get_model("v1")
+        model_v2 = SentimentModel.get_model("v2")
+        logger.info(f"Model v1 loaded: {model_v1.is_loaded}")
+        logger.info(f"Model v2 loaded: {model_v2.is_loaded}")
         
         # Initialize database tables
         try:
