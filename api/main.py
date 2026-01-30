@@ -6,8 +6,10 @@ from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from prometheus_client import make_asgi_app
 import time
 import logging
+import json
 from typing import Optional
 
 from api.schemas import (
@@ -16,13 +18,22 @@ from api.schemas import (
     HealthResponse,
     ErrorResponse,
     BatchPredictRequest,
-    BatchPredictResponse
+    BatchPredictResponse,
+    CacheStatsResponse
 )
-from api.dependencies import get_model
+from api.dependencies import get_model, get_redis
 from api import analytics
 from models.sentiment import SentimentModel
+from cache.redis_client import RedisCache
 from db.database import get_db, init_db, close_db
 from db.models import Prediction
+from monitoring.metrics import (
+    track_request,
+    track_cache_hit,
+    track_cache_miss,
+    track_prediction,
+    get_cache_stats
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -45,6 +56,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount Prometheus metrics endpoint
+metrics_app = make_asgi_app()
+app.mount("/metrics", metrics_app)
 
 # Include analytics router
 app.include_router(analytics.router)
@@ -107,43 +122,97 @@ async def health_check():
 async def predict_sentiment(
     request: PredictRequest,
     model: SentimentModel = Depends(get_model),
+    redis: Optional[RedisCache] = Depends(get_redis),
     db: Optional[AsyncSession] = Depends(get_db)
 ):
     """
-    Analyze sentiment of provided text.
+    Analyze sentiment of provided text with caching.
     
     Returns:
         - sentiment: positive, negative, or neutral
         - confidence: score between 0 and 1
         - latency_ms: inference time in milliseconds
+        - cache_hit: whether result was served from cache
     
     Also logs prediction to database for analytics.
     """
+    request_start = time.perf_counter()
+    cache_hit = False
+    sentiment = None
+    confidence = None
+    latency_ms = None
+    
     try:
-        # Time the prediction
-        start_time = time.perf_counter()
+        # Try cache first if Redis is available
+        if redis is not None:
+            cache_key = redis.generate_cache_key(request.text)
+            cached_result = await redis.get(cache_key)
+            
+            if cached_result is not None:
+                # Cache hit!
+                try:
+                    cached_data = json.loads(cached_result)
+                    sentiment = cached_data["sentiment"]
+                    confidence = cached_data["confidence"]
+                    # Latency for cache hit is just the cache lookup time
+                    latency_ms = round((time.perf_counter() - request_start) * 1000, 2)
+                    # Ensure minimum latency of 0.01ms to satisfy validation
+                    latency_ms = max(latency_ms, 0.01)
+                    cache_hit = True
+                    
+                    # Track metrics
+                    track_cache_hit()
+                    track_prediction(sentiment)
+                    
+                    logger.debug(f"Cache hit for key: {cache_key}")
+                except Exception as cache_error:
+                    logger.error(f"Error parsing cached result: {cache_error}")
+                    # Continue to model prediction if cache parse fails
+                    cached_result = None
         
-        # Get prediction from model
-        result = model.predict(request.text)
-        
-        # Calculate latency
-        end_time = time.perf_counter()
-        latency_ms = round((end_time - start_time) * 1000, 2)
-        
-        # Map HuggingFace labels to our schema
-        sentiment_map = {
-            "POSITIVE": "positive",
-            "NEGATIVE": "negative",
-            "NEUTRAL": "neutral"
-        }
-        
-        sentiment = sentiment_map.get(
-            result["label"].upper(),
-            "neutral"
-        )
-        
-        # Round confidence to 4 decimals
-        confidence = round(result["score"], 4)
+        # Cache miss or no cache - run model prediction
+        if not cache_hit:
+            # Time the model prediction
+            model_start = time.perf_counter()
+            
+            # Get prediction from model
+            result = model.predict(request.text)
+            
+            # Calculate latency
+            model_end = time.perf_counter()
+            latency_ms = round((model_end - model_start) * 1000, 2)
+            
+            # Map HuggingFace labels to our schema
+            sentiment_map = {
+                "POSITIVE": "positive",
+                "NEGATIVE": "negative",
+                "NEUTRAL": "neutral"
+            }
+            
+            sentiment = sentiment_map.get(
+                result["label"].upper(),
+                "neutral"
+            )
+            
+            # Round confidence to 4 decimals
+            confidence = round(result["score"], 4)
+            
+            # Cache the result if Redis is available
+            if redis is not None:
+                try:
+                    cache_data = {
+                        "sentiment": sentiment,
+                        "confidence": confidence
+                    }
+                    cache_key = redis.generate_cache_key(request.text)
+                    await redis.set(cache_key, json.dumps(cache_data), ttl=3600)
+                    logger.debug(f"Cached result for key: {cache_key}")
+                except Exception as cache_error:
+                    logger.error(f"Failed to cache result: {cache_error}")
+            
+            # Track metrics
+            track_cache_miss()
+            track_prediction(sentiment)
         
         # Log prediction to database (gracefully handle DB errors)
         if db is not None:
@@ -154,7 +223,7 @@ async def predict_sentiment(
                     confidence_score=confidence,
                     latency_ms=latency_ms,
                     model_version="distilbert-v1",
-                    cache_hit=False
+                    cache_hit=cache_hit
                 )
                 db.add(prediction)
                 await db.commit()
@@ -164,10 +233,15 @@ async def predict_sentiment(
                 # Don't fail the request if database logging fails
                 await db.rollback()
         
+        # Track request metrics
+        request_latency = time.perf_counter() - request_start
+        track_request("/predict", 200, request_latency)
+        
         return PredictResponse(
             sentiment=sentiment,
             confidence=confidence,
-            latency_ms=latency_ms
+            latency_ms=latency_ms,
+            cache_hit=cache_hit
         )
         
     except ValueError as e:
@@ -193,10 +267,11 @@ async def predict_sentiment(
 async def batch_predict_sentiment(
     request: BatchPredictRequest,
     model: SentimentModel = Depends(get_model),
+    redis: Optional[RedisCache] = Depends(get_redis),
     db: Optional[AsyncSession] = Depends(get_db)
 ):
     """
-    Analyze sentiment for multiple texts in a single request.
+    Analyze sentiment for multiple texts in a single request with caching.
     
     Args:
         request: BatchPredictRequest with list of texts (max 100)
@@ -211,37 +286,67 @@ async def batch_predict_sentiment(
         db_predictions = []
         
         for text in request.texts:
-            # Time each prediction
-            start_time = time.perf_counter()
+            cache_hit = False
+            sentiment = None
+            confidence = None
+            latency_ms = None
             
-            # Get prediction from model
-            result = model.predict(text)
+            # Try cache first if Redis is available
+            if redis is not None:
+                cache_key = redis.generate_cache_key(text)
+                cached_result = await redis.get(cache_key)
+                
+                if cached_result is not None:
+                    try:
+                        start_time = time.perf_counter()
+                        cached_data = json.loads(cached_result)
+                        sentiment = cached_data["sentiment"]
+                        confidence = cached_data["confidence"]
+                        latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
+                        # Ensure minimum latency of 0.01ms to satisfy validation
+                        latency_ms = max(latency_ms, 0.01)
+                        cache_hit = True
+                        track_cache_hit()
+                    except Exception:
+                        cached_result = None
             
-            # Calculate latency
-            end_time = time.perf_counter()
-            latency_ms = round((end_time - start_time) * 1000, 2)
+            # Cache miss - run model prediction
+            if not cache_hit:
+                start_time = time.perf_counter()
+                result = model.predict(text)
+                end_time = time.perf_counter()
+                latency_ms = round((end_time - start_time) * 1000, 2)
+                
+                sentiment_map = {
+                    "POSITIVE": "positive",
+                    "NEGATIVE": "negative",
+                    "NEUTRAL": "neutral"
+                }
+                
+                sentiment = sentiment_map.get(result["label"].upper(), "neutral")
+                confidence = round(result["score"], 4)
+                
+                # Cache the result
+                if redis is not None:
+                    try:
+                        cache_data = {"sentiment": sentiment, "confidence": confidence}
+                        cache_key = redis.generate_cache_key(text)
+                        await redis.set(cache_key, json.dumps(cache_data), ttl=3600)
+                    except Exception as cache_error:
+                        logger.error(f"Failed to cache result: {cache_error}")
+                
+                track_cache_miss()
             
-            # Map HuggingFace labels to our schema
-            sentiment_map = {
-                "POSITIVE": "positive",
-                "NEGATIVE": "negative",
-                "NEUTRAL": "neutral"
-            }
-            
-            sentiment = sentiment_map.get(
-                result["label"].upper(),
-                "neutral"
-            )
-            
-            # Round confidence to 4 decimals
-            confidence = round(result["score"], 4)
+            # Track metrics
+            track_prediction(sentiment)
             
             # Add to response list
             predictions.append(
                 PredictResponse(
                     sentiment=sentiment,
                     confidence=confidence,
-                    latency_ms=latency_ms
+                    latency_ms=latency_ms,
+                    cache_hit=cache_hit
                 )
             )
             
@@ -254,7 +359,7 @@ async def batch_predict_sentiment(
                         confidence_score=confidence,
                         latency_ms=latency_ms,
                         model_version="distilbert-v1",
-                        cache_hit=False
+                        cache_hit=cache_hit
                     )
                 )
         
@@ -284,6 +389,47 @@ async def batch_predict_sentiment(
         raise HTTPException(
             status_code=500,
             detail=f"Batch prediction failed: {str(e)}"
+        )
+
+
+@app.get(
+    "/cache/stats",
+    response_model=CacheStatsResponse,
+    tags=["Cache"],
+    summary="Get cache statistics"
+)
+async def get_cache_statistics(
+    redis: Optional[RedisCache] = Depends(get_redis)
+):
+    """
+    Get cache hit/miss statistics and current cache size.
+    
+    Returns:
+        - hits: Total cache hits
+        - misses: Total cache misses
+        - hit_rate: Cache hit rate percentage (0-100)
+        - cache_size: Current number of keys in cache
+    """
+    try:
+        # Get stats from metrics
+        stats = get_cache_stats()
+        
+        # Get cache size from Redis
+        cache_size = 0
+        if redis is not None:
+            cache_size = await redis.get_cache_size()
+        
+        return CacheStatsResponse(
+            hits=stats["hits"],
+            misses=stats["misses"],
+            hit_rate=stats["hit_rate"],
+            cache_size=cache_size
+        )
+    except Exception as e:
+        logger.error(f"Error getting cache stats: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get cache statistics: {str(e)}"
         )
 
 

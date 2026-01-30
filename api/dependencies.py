@@ -1,7 +1,9 @@
 """
 Dependency injection for FastAPI
 """
+from typing import Optional
 from models.sentiment import SentimentModel
+from cache.redis_client import RedisCache
 from fastapi import HTTPException
 import logging
 
@@ -34,4 +36,23 @@ def get_model() -> SentimentModel:
             status_code=503,
             detail=f"Model initialization failed: {str(e)}"
         )
+
+
+def get_redis() -> Optional[RedisCache]:
+    """
+    Dependency injection for Redis cache.
+    Returns singleton instance of RedisCache or None if unavailable.
+    
+    Returns:
+        RedisCache or None: Redis cache client if available
+    """
+    try:
+        redis_client = RedisCache()
+        if not redis_client.is_available:
+            logger.warning("Redis client not available - running without cache")
+            return None
+        return redis_client
+    except Exception as e:
+        logger.warning(f"Failed to get Redis client: {e} - running without cache")
+        return None
 

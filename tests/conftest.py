@@ -3,16 +3,24 @@ Pytest configuration and fixtures
 """
 import pytest
 import asyncio
+import os
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.pool import NullPool
 from datetime import datetime
 import uuid
+from unittest.mock import patch
+import fakeredis.aioredis
 
 from api.main import app
 from db.models import Base, Prediction
 from db.database import get_db
+from cache.redis_client import RedisCache
+from api.dependencies import get_redis
 
+
+# Set test environment variables
+os.environ["REDIS_URL"] = "redis://localhost:6379/0"
 
 # Test database URL (using SQLite for testing)
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
@@ -66,7 +74,7 @@ def test_db(async_db_session):
 
 
 @pytest.fixture
-def client_with_db():
+def client_with_db(redis_cache):
     """Test client with database dependency override (using in-memory SQLite)"""
     # For testing, we'll use a simpler approach - just skip DB operations
     # In a real production environment, you'd set up a test PostgreSQL database
@@ -106,18 +114,34 @@ def client_with_db():
         
         await engine.dispose()
     
+    # Don't override get_redis - use real Redis
+    
     app.dependency_overrides[get_db] = override_get_db
     client = TestClient(app)
     yield client
     app.dependency_overrides.clear()
 
 
+@pytest.fixture(scope="function")
+def redis_cache():
+    """Get the real Redis cache instance (requires Docker Redis to be running)"""
+    # Reset singleton to get fresh connection
+    RedisCache._instance = None
+    cache = RedisCache()
+    yield cache
+    # Reset for next test
+    RedisCache._instance = None
+
+
 @pytest.fixture
-def client():
-    """Test client for FastAPI app (without database)"""
+def client(redis_cache):
+    """Test client for FastAPI app with Redis"""
     # Override get_db to return None (gracefully handle missing DB)
     async def override_get_db():
         yield None
+    
+    # Don't override get_redis - let it use the real Redis
+    # (Tests will use the actual Docker Redis instance)
     
     app.dependency_overrides[get_db] = override_get_db
     client = TestClient(app)

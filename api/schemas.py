@@ -43,13 +43,18 @@ class PredictResponse(BaseModel):
         gt=0.0,
         description="Inference latency in milliseconds"
     )
+    cache_hit: bool = Field(
+        default=False,
+        description="Whether result was served from cache"
+    )
     
     class Config:
         json_schema_extra = {
             "example": {
                 "sentiment": "positive",
                 "confidence": 0.9998,
-                "latency_ms": 45.23
+                "latency_ms": 45.23,
+                "cache_hit": False
             }
         }
 
@@ -224,6 +229,24 @@ class RecentPredictionResponse(BaseModel):
                 "confidence": 0.9998,
                 "latency_ms": 45.23,
                 "model_version": "distilbert-v1"
+            }
+        }
+
+
+class CacheStatsResponse(BaseModel):
+    """Response schema for cache statistics"""
+    hits: int = Field(..., description="Total cache hits")
+    misses: int = Field(..., description="Total cache misses")
+    hit_rate: float = Field(..., description="Cache hit rate percentage (0-100)")
+    cache_size: int = Field(..., description="Current number of keys in cache")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "hits": 150,
+                "misses": 50,
+                "hit_rate": 75.0,
+                "cache_size": 45
             }
         }
 
