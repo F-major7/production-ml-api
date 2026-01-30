@@ -55,6 +55,12 @@ logger = logging.getLogger(__name__)
 # Check if running in test mode (disables rate limiting)
 TESTING = os.getenv("TESTING", "0") == "1"
 
+# Rate limit configuration (overridable via environment variables)
+RATE_LIMIT_PREDICT = os.getenv("RATE_LIMIT_PREDICT", "100/minute")
+RATE_LIMIT_BATCH = os.getenv("RATE_LIMIT_BATCH", "20/minute")
+RATE_LIMIT_ANALYTICS = os.getenv("RATE_LIMIT_ANALYTICS", "60/minute")
+RATE_LIMIT_AB = os.getenv("RATE_LIMIT_AB", "100/minute")
+
 # Initialize rate limiter (disabled during tests)
 limiter = Limiter(key_func=get_remote_address, enabled=not TESTING)
 
@@ -171,7 +177,7 @@ async def health_check(
     tags=["Prediction"],
     summary="Predict sentiment of text",
 )
-@limiter.limit("100/minute")
+@limiter.limit(RATE_LIMIT_PREDICT)
 async def predict_sentiment(
     request: Request,
     predict_request: PredictRequest,
@@ -306,7 +312,7 @@ async def predict_sentiment(
     tags=["Prediction"],
     summary="Batch predict sentiment for multiple texts",
 )
-@limiter.limit("20/minute")
+@limiter.limit(RATE_LIMIT_BATCH)
 async def batch_predict_sentiment(
     request: Request,
     batch_request: BatchPredictRequest,
@@ -437,7 +443,7 @@ async def batch_predict_sentiment(
     tags=["Cache"],
     summary="Get cache statistics",
 )
-@limiter.limit("60/minute")
+@limiter.limit(RATE_LIMIT_ANALYTICS)
 async def get_cache_statistics(
     request: Request, redis: Optional[RedisCache] = Depends(get_redis)
 ):
@@ -520,7 +526,7 @@ async def get_rate_limit_status(request: Request):
     tags=["Prediction", "A/B Testing"],
     summary="Predict with A/B testing",
 )
-@limiter.limit("100/minute")
+@limiter.limit(RATE_LIMIT_AB)
 async def predict_sentiment_ab(
     request: Request,
     predict_request: PredictRequest,
@@ -634,7 +640,7 @@ async def predict_sentiment_ab(
     tags=["A/B Testing"],
     summary="Compare A/B test results",
 )
-@limiter.limit("60/minute")
+@limiter.limit(RATE_LIMIT_ANALYTICS)
 async def get_ab_comparison(request: Request, db: AsyncSession = Depends(get_db)):
     """
     Get comparison statistics between model versions.

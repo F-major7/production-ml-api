@@ -15,6 +15,10 @@ services:
       MKL_NUM_THREADS: "4"
       TORCH_NUM_THREADS: "4"
       TORCH_NUM_INTEROP_THREADS: "1"
+      RATE_LIMIT_PREDICT: "${RATE_LIMIT_PREDICT:-100/minute}"
+      RATE_LIMIT_BATCH: "${RATE_LIMIT_BATCH:-20/minute}"
+      RATE_LIMIT_ANALYTICS: "${RATE_LIMIT_ANALYTICS:-60/minute}"
+      RATE_LIMIT_AB: "${RATE_LIMIT_AB:-100/minute}"
       # TESTING: "1"  # Only for pytest, not production/load testing
     ports:
       - "8000:8000"

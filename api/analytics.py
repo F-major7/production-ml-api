@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import List, Optional
 import logging
+import os
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -23,6 +24,9 @@ logger = logging.getLogger(__name__)
 # Initialize rate limiter for analytics
 limiter = Limiter(key_func=get_remote_address)
 
+# Rate limit configuration (overridable via environment variables)
+RATE_LIMIT_ANALYTICS = os.getenv("RATE_LIMIT_ANALYTICS", "60/minute")
+
 router = APIRouter(
     prefix="/analytics",
     tags=["Analytics"],
@@ -34,7 +38,7 @@ router = APIRouter(
     response_model=AnalyticsSummaryResponse,
     summary="Get overall prediction statistics",
 )
-@limiter.limit("60/minute")
+@limiter.limit(RATE_LIMIT_ANALYTICS)
 async def get_analytics_summary(request: Request, db: AsyncSession = Depends(get_db)):
     """
     Get summary statistics for all predictions.
@@ -90,7 +94,7 @@ async def get_analytics_summary(request: Request, db: AsyncSession = Depends(get
     response_model=SentimentDistributionResponse,
     summary="Get sentiment distribution counts",
 )
-@limiter.limit("60/minute")
+@limiter.limit(RATE_LIMIT_ANALYTICS)
 async def get_sentiment_distribution(
     request: Request, db: AsyncSession = Depends(get_db)
 ):
@@ -134,7 +138,7 @@ async def get_sentiment_distribution(
     response_model=List[RecentPredictionResponse],
     summary="Get recent predictions",
 )
-@limiter.limit("60/minute")
+@limiter.limit(RATE_LIMIT_ANALYTICS)
 async def get_recent_predictions(
     request: Request,
     limit: int = Query(
