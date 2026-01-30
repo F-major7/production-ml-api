@@ -15,8 +15,11 @@ services:
       MKL_NUM_THREADS: "1"
       NUMEXPR_NUM_THREADS: "1"
       OPENBLAS_NUM_THREADS: "1"
+      # HuggingFace tokenizer parallelism fix
+      TOKENIZERS_PARALLELISM: "false"
     ports:
       - "8000:8000"
+    shm_size: '8gb'
     deploy:
       resources:
         limits:

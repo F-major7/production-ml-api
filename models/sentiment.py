@@ -5,6 +5,8 @@ Supports multiple model versions for A/B testing
 from typing import Dict, Optional
 from transformers import pipeline
 import logging
+import torch
+import gc
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -55,9 +57,11 @@ class SentimentModel:
         if self._pipeline is None:
             try:
                 logger.info(f"Loading sentiment analysis model (version: {self.version})...")
+                # Force CPU device to avoid CUDA/GPU issues in Docker
                 self._pipeline = pipeline(
                     "sentiment-analysis",
-                    model="distilbert-base-uncased-finetuned-sst-2-english"
+                    model="distilbert-base-uncased-finetuned-sst-2-english",
+                    device=-1  # -1 forces CPU, avoids CUDA/GPU segfaults
                 )
                 logger.info(f"Model {self.version} loaded successfully")
             except Exception as e:
@@ -85,8 +89,14 @@ class SentimentModel:
             raise ValueError("Text cannot be empty")
         
         try:
-            # Pipeline returns list with single result for single input
-            result = self._pipeline(text)[0]
+            # Use torch.no_grad() for inference to save memory and prevent crashes
+            with torch.no_grad():
+                # Pipeline returns list with single result for single input
+                result = self._pipeline(text)[0]
+            
+            # Explicit garbage collection to prevent memory leaks in Docker
+            gc.collect()
+            
             return {
                 "label": result["label"],
                 "score": result["score"]
