@@ -1,6 +1,7 @@
 """
 Pytest configuration and fixtures
 """
+
 import pytest
 import asyncio
 import os
@@ -17,7 +18,6 @@ from db.models import Base, Prediction
 from db.database import get_db
 from cache.redis_client import RedisCache
 from api.dependencies import get_redis
-
 
 # Set test environment variables
 os.environ["REDIS_URL"] = "redis://localhost:6379/0"
@@ -37,33 +37,29 @@ def event_loop():
 @pytest.fixture(scope="function")
 async def async_db_session():
     """Create a test database session"""
-    engine = create_async_engine(
-        TEST_DATABASE_URL,
-        echo=False,
-        poolclass=NullPool
-    )
-    
+    engine = create_async_engine(TEST_DATABASE_URL, echo=False, poolclass=NullPool)
+
     # Create tables
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    
+
     # Create session
     TestSessionLocal = async_sessionmaker(
         engine,
         class_=AsyncSession,
         expire_on_commit=False,
         autoflush=False,
-        autocommit=False
+        autocommit=False,
     )
-    
+
     async with TestSessionLocal() as session:
         yield session
         await session.rollback()
-    
+
     # Drop tables
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
-    
+
     await engine.dispose()
 
 
@@ -78,30 +74,32 @@ def client_with_db(redis_cache):
     """Test client with database dependency override (using in-memory SQLite)"""
     # For testing, we'll use a simpler approach - just skip DB operations
     # In a real production environment, you'd set up a test PostgreSQL database
-    
+
     # Override to return None - endpoints handle this gracefully
     async def override_get_db():
         # Create in-memory SQLite for testing
-        from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+        from sqlalchemy.ext.asyncio import (
+            create_async_engine,
+            async_sessionmaker,
+            AsyncSession,
+        )
         from sqlalchemy.pool import StaticPool
-        
+
         engine = create_async_engine(
             "sqlite+aiosqlite:///:memory:",
             connect_args={"check_same_thread": False},
             poolclass=StaticPool,
         )
-        
+
         # Create tables
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-        
+
         # Create session
         TestSessionLocal = async_sessionmaker(
-            engine,
-            class_=AsyncSession,
-            expire_on_commit=False
+            engine, class_=AsyncSession, expire_on_commit=False
         )
-        
+
         async with TestSessionLocal() as session:
             try:
                 yield session
@@ -111,11 +109,11 @@ def client_with_db(redis_cache):
                 raise
             finally:
                 await session.close()
-        
+
         await engine.dispose()
-    
+
     # Don't override get_redis - use real Redis
-    
+
     app.dependency_overrides[get_db] = override_get_db
     client = TestClient(app)
     yield client
@@ -136,13 +134,14 @@ def redis_cache():
 @pytest.fixture
 def client(redis_cache):
     """Test client for FastAPI app with Redis"""
+
     # Override get_db to return None (gracefully handle missing DB)
     async def override_get_db():
         yield None
-    
+
     # Don't override get_redis - let it use the real Redis
     # (Tests will use the actual Docker Redis instance)
-    
+
     app.dependency_overrides[get_db] = override_get_db
     client = TestClient(app)
     yield client
@@ -185,7 +184,7 @@ async def sample_predictions(async_db_session):
             latency_ms=45.23,
             model_version="distilbert-v1",
             cache_hit=False,
-            timestamp=datetime(2026, 1, 29, 10, 0, 0)
+            timestamp=datetime(2026, 1, 29, 10, 0, 0),
         ),
         Prediction(
             id=uuid.uuid4(),
@@ -195,7 +194,7 @@ async def sample_predictions(async_db_session):
             latency_ms=38.17,
             model_version="distilbert-v1",
             cache_hit=False,
-            timestamp=datetime(2026, 1, 29, 11, 0, 0)
+            timestamp=datetime(2026, 1, 29, 11, 0, 0),
         ),
         Prediction(
             id=uuid.uuid4(),
@@ -205,15 +204,14 @@ async def sample_predictions(async_db_session):
             latency_ms=42.50,
             model_version="distilbert-v1",
             cache_hit=False,
-            timestamp=datetime(2026, 1, 29, 12, 0, 0)
+            timestamp=datetime(2026, 1, 29, 12, 0, 0),
         ),
     ]
-    
+
     async_db_session.add_all(predictions)
     await async_db_session.commit()
-    
+
     for p in predictions:
         await async_db_session.refresh(p)
-    
-    return predictions
 
+    return predictions

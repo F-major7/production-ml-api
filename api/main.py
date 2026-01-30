@@ -2,6 +2,7 @@
 Production ML API - Main FastAPI Application
 Sentiment analysis API with full observability
 """
+
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -28,7 +29,7 @@ from api.schemas import (
     ABPredictResponse,
     ABComparisonResponse,
     ModelStats,
-    ComparisonStats
+    ComparisonStats,
 )
 from api.dependencies import get_model, get_redis
 from api import analytics
@@ -43,7 +44,7 @@ from monitoring.metrics import (
     track_cache_miss,
     track_prediction,
     get_cache_stats,
-    track_rate_limit_exceeded
+    track_rate_limit_exceeded,
 )
 from sqlalchemy import func, select
 
@@ -63,7 +64,7 @@ app = FastAPI(
     version="1.0.0",
     description="Sentiment analysis with full observability",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
 )
 
 # Add rate limiter to app state
@@ -91,20 +92,13 @@ app.include_router(analytics.router)
 @app.get("/", tags=["Root"])
 async def root():
     """Root endpoint with API information"""
-    return {
-        "message": "Production ML API",
-        "docs": "/docs"
-    }
+    return {"message": "Production ML API", "docs": "/docs"}
 
 
-@app.get(
-    "/health",
-    tags=["Health"],
-    summary="Health check endpoint"
-)
+@app.get("/health", tags=["Health"], summary="Health check endpoint")
 async def health_check(
     redis: Optional[RedisCache] = Depends(get_redis),
-    db: Optional[AsyncSession] = Depends(get_db)
+    db: Optional[AsyncSession] = Depends(get_db),
 ):
     """
     Check API health status including model, database, and Redis.
@@ -114,18 +108,18 @@ async def health_check(
         "status": "healthy",
         "model_loaded": False,
         "database_connected": False,
-        "redis_connected": False
+        "redis_connected": False,
     }
-    
+
     is_healthy = True
-    
+
     try:
         # Check model
         model = SentimentModel.get_model()
         health_status["model_loaded"] = model.is_loaded
         if not model.is_loaded:
             is_healthy = False
-        
+
         # Check database
         if db is not None:
             try:
@@ -137,7 +131,7 @@ async def health_check(
                 health_status["database_connected"] = False
                 # Database is critical, mark as unhealthy
                 is_healthy = False
-        
+
         # Check Redis
         if redis is not None and redis.is_available:
             try:
@@ -148,7 +142,7 @@ async def health_check(
                 logger.warning(f"Redis health check failed: {redis_error}")
                 health_status["redis_connected"] = False
                 # Redis is not critical, don't mark as unhealthy
-        
+
         # Set overall status
         if is_healthy:
             health_status["status"] = "healthy"
@@ -156,7 +150,7 @@ async def health_check(
         else:
             health_status["status"] = "unhealthy"
             return JSONResponse(status_code=503, content=health_status)
-            
+
     except Exception as e:
         logger.error(f"Health check failed: {e}")
         return JSONResponse(
@@ -166,8 +160,8 @@ async def health_check(
                 "model_loaded": False,
                 "database_connected": False,
                 "redis_connected": False,
-                "error": str(e)
-            }
+                "error": str(e),
+            },
         )
 
 
@@ -175,7 +169,7 @@ async def health_check(
     "/predict",
     response_model=PredictResponse,
     tags=["Prediction"],
-    summary="Predict sentiment of text"
+    summary="Predict sentiment of text",
 )
 @limiter.limit("100/minute")
 async def predict_sentiment(
@@ -183,17 +177,17 @@ async def predict_sentiment(
     predict_request: PredictRequest,
     model: SentimentModel = Depends(get_model),
     redis: Optional[RedisCache] = Depends(get_redis),
-    db: Optional[AsyncSession] = Depends(get_db)
+    db: Optional[AsyncSession] = Depends(get_db),
 ):
     """
     Analyze sentiment of provided text with caching.
-    
+
     Returns:
         - sentiment: positive, negative, or neutral
         - confidence: score between 0 and 1
         - latency_ms: inference time in milliseconds
         - cache_hit: whether result was served from cache
-    
+
     Also logs prediction to database for analytics.
     """
     request_start = time.perf_counter()
@@ -201,13 +195,13 @@ async def predict_sentiment(
     sentiment = None
     confidence = None
     latency_ms = None
-    
+
     try:
         # Try cache first if Redis is available
         if redis is not None:
             cache_key = redis.generate_cache_key(predict_request.text)
             cached_result = await redis.get(cache_key)
-            
+
             if cached_result is not None:
                 # Cache hit!
                 try:
@@ -219,61 +213,55 @@ async def predict_sentiment(
                     # Ensure minimum latency of 0.01ms to satisfy validation
                     latency_ms = max(latency_ms, 0.01)
                     cache_hit = True
-                    
+
                     # Track metrics
                     track_cache_hit()
                     track_prediction(sentiment)
-                    
+
                     logger.debug(f"Cache hit for key: {cache_key}")
                 except Exception as cache_error:
                     logger.error(f"Error parsing cached result: {cache_error}")
                     # Continue to model prediction if cache parse fails
                     cached_result = None
-        
+
         # Cache miss or no cache - run model prediction
         if not cache_hit:
             # Time the model prediction
             model_start = time.perf_counter()
-            
+
             # Get prediction from model
             result = model.predict(predict_request.text)
-            
+
             # Calculate latency
             model_end = time.perf_counter()
             latency_ms = round((model_end - model_start) * 1000, 2)
-            
+
             # Map HuggingFace labels to our schema
             sentiment_map = {
                 "POSITIVE": "positive",
                 "NEGATIVE": "negative",
-                "NEUTRAL": "neutral"
+                "NEUTRAL": "neutral",
             }
-            
-            sentiment = sentiment_map.get(
-                result["label"].upper(),
-                "neutral"
-            )
-            
+
+            sentiment = sentiment_map.get(result["label"].upper(), "neutral")
+
             # Round confidence to 4 decimals
             confidence = round(result["score"], 4)
-            
+
             # Cache the result if Redis is available
             if redis is not None:
                 try:
-                    cache_data = {
-                        "sentiment": sentiment,
-                        "confidence": confidence
-                    }
+                    cache_data = {"sentiment": sentiment, "confidence": confidence}
                     cache_key = redis.generate_cache_key(predict_request.text)
                     await redis.set(cache_key, json.dumps(cache_data), ttl=3600)
                     logger.debug(f"Cached result for key: {cache_key}")
                 except Exception as cache_error:
                     logger.error(f"Failed to cache result: {cache_error}")
-            
+
             # Track metrics
             track_cache_miss()
             track_prediction(sentiment)
-        
+
         # Log prediction to database (gracefully handle DB errors)
         if db is not None:
             try:
@@ -283,7 +271,7 @@ async def predict_sentiment(
                     confidence_score=confidence,
                     latency_ms=latency_ms,
                     model_version="distilbert-v1",
-                    cache_hit=cache_hit
+                    cache_hit=cache_hit,
                 )
                 db.add(prediction)
                 await db.commit()
@@ -292,37 +280,31 @@ async def predict_sentiment(
                 logger.error(f"Failed to log prediction to database: {db_error}")
                 # Don't fail the request if database logging fails
                 await db.rollback()
-        
+
         # Track request metrics
         request_latency = time.perf_counter() - request_start
         track_request("/predict", 200, request_latency)
-        
+
         return PredictResponse(
             sentiment=sentiment,
             confidence=confidence,
             latency_ms=latency_ms,
-            cache_hit=cache_hit
+            cache_hit=cache_hit,
         )
-        
+
     except ValueError as e:
         logger.error(f"Validation error: {e}")
-        raise HTTPException(
-            status_code=400,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Prediction error: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Prediction failed: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
 
 
 @app.post(
     "/batch",
     response_model=BatchPredictResponse,
     tags=["Prediction"],
-    summary="Batch predict sentiment for multiple texts"
+    summary="Batch predict sentiment for multiple texts",
 )
 @limiter.limit("20/minute")
 async def batch_predict_sentiment(
@@ -330,34 +312,34 @@ async def batch_predict_sentiment(
     batch_request: BatchPredictRequest,
     model: SentimentModel = Depends(get_model),
     redis: Optional[RedisCache] = Depends(get_redis),
-    db: Optional[AsyncSession] = Depends(get_db)
+    db: Optional[AsyncSession] = Depends(get_db),
 ):
     """
     Analyze sentiment for multiple texts in a single request with caching.
-    
+
     Args:
         request: BatchPredictRequest with list of texts (max 100)
-    
+
     Returns:
         BatchPredictResponse with list of predictions and total count
-    
+
     All predictions are logged to database for analytics.
     """
     try:
         predictions = []
         db_predictions = []
-        
+
         for text in batch_request.texts:
             cache_hit = False
             sentiment = None
             confidence = None
             latency_ms = None
-            
+
             # Try cache first if Redis is available
             if redis is not None:
                 cache_key = redis.generate_cache_key(text)
                 cached_result = await redis.get(cache_key)
-                
+
                 if cached_result is not None:
                     try:
                         start_time = time.perf_counter()
@@ -371,23 +353,23 @@ async def batch_predict_sentiment(
                         track_cache_hit()
                     except Exception:
                         cached_result = None
-            
+
             # Cache miss - run model prediction
             if not cache_hit:
                 start_time = time.perf_counter()
                 result = model.predict(text)
                 end_time = time.perf_counter()
                 latency_ms = round((end_time - start_time) * 1000, 2)
-                
+
                 sentiment_map = {
                     "POSITIVE": "positive",
                     "NEGATIVE": "negative",
-                    "NEUTRAL": "neutral"
+                    "NEUTRAL": "neutral",
                 }
-                
+
                 sentiment = sentiment_map.get(result["label"].upper(), "neutral")
                 confidence = round(result["score"], 4)
-                
+
                 # Cache the result
                 if redis is not None:
                     try:
@@ -396,22 +378,22 @@ async def batch_predict_sentiment(
                         await redis.set(cache_key, json.dumps(cache_data), ttl=3600)
                     except Exception as cache_error:
                         logger.error(f"Failed to cache result: {cache_error}")
-                
+
                 track_cache_miss()
-            
+
             # Track metrics
             track_prediction(sentiment)
-            
+
             # Add to response list
             predictions.append(
                 PredictResponse(
                     sentiment=sentiment,
                     confidence=confidence,
                     latency_ms=latency_ms,
-                    cache_hit=cache_hit
+                    cache_hit=cache_hit,
                 )
             )
-            
+
             # Prepare database record
             if db is not None:
                 db_predictions.append(
@@ -421,36 +403,31 @@ async def batch_predict_sentiment(
                         confidence_score=confidence,
                         latency_ms=latency_ms,
                         model_version="distilbert-v1",
-                        cache_hit=cache_hit
+                        cache_hit=cache_hit,
                     )
                 )
-        
+
         # Bulk insert to database (gracefully handle DB errors)
         if db is not None and db_predictions:
             try:
                 db.add_all(db_predictions)
                 await db.commit()
-                logger.info(f"Batch of {len(db_predictions)} predictions logged to database")
+                logger.info(
+                    f"Batch of {len(db_predictions)} predictions logged to database"
+                )
             except Exception as db_error:
                 logger.error(f"Failed to log batch predictions to database: {db_error}")
                 await db.rollback()
-        
-        return BatchPredictResponse(
-            predictions=predictions,
-            total=len(predictions)
-        )
-        
+
+        return BatchPredictResponse(predictions=predictions, total=len(predictions))
+
     except ValueError as e:
         logger.error(f"Validation error: {e}")
-        raise HTTPException(
-            status_code=400,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Batch prediction error: {e}")
         raise HTTPException(
-            status_code=500,
-            detail=f"Batch prediction failed: {str(e)}"
+            status_code=500, detail=f"Batch prediction failed: {str(e)}"
         )
 
 
@@ -458,16 +435,15 @@ async def batch_predict_sentiment(
     "/cache/stats",
     response_model=CacheStatsResponse,
     tags=["Cache"],
-    summary="Get cache statistics"
+    summary="Get cache statistics",
 )
 @limiter.limit("60/minute")
 async def get_cache_statistics(
-    request: Request,
-    redis: Optional[RedisCache] = Depends(get_redis)
+    request: Request, redis: Optional[RedisCache] = Depends(get_redis)
 ):
     """
     Get cache hit/miss statistics and current cache size.
-    
+
     Returns:
         - hits: Total cache hits
         - misses: Total cache misses
@@ -477,23 +453,22 @@ async def get_cache_statistics(
     try:
         # Get stats from metrics
         stats = get_cache_stats()
-        
+
         # Get cache size from Redis
         cache_size = 0
         if redis is not None:
             cache_size = await redis.get_cache_size()
-        
+
         return CacheStatsResponse(
             hits=stats["hits"],
             misses=stats["misses"],
             hit_rate=stats["hit_rate"],
-            cache_size=cache_size
+            cache_size=cache_size,
         )
     except Exception as e:
         logger.error(f"Error getting cache stats: {e}")
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get cache statistics: {str(e)}"
+            status_code=500, detail=f"Failed to get cache statistics: {str(e)}"
         )
 
 
@@ -501,19 +476,19 @@ async def get_cache_statistics(
     "/rate-limit/status",
     response_model=RateLimitStatusResponse,
     tags=["Rate Limiting"],
-    summary="Get current rate limit status"
+    summary="Get current rate limit status",
 )
 async def get_rate_limit_status(request: Request):
     """
     Get current rate limit status for the requesting IP.
-    
+
     Returns information about rate limit quota and remaining requests.
     Note: This endpoint itself is not rate limited.
     """
     try:
         # Get client IP
         client_ip = get_remote_address(request)
-        
+
         # Get rate limit info from slowapi
         # slowapi stores limits in request state
         rate_limit_headers = {}
@@ -522,21 +497,20 @@ async def get_rate_limit_status(request: Request):
             rate_limit_headers = {
                 "limit": str(limit_info),
                 "remaining": getattr(request.state, "remaining", 0),
-                "reset": getattr(request.state, "reset", 0)
+                "reset": getattr(request.state, "reset", 0),
             }
-        
+
         # Default response if no rate limit info available
         return RateLimitStatusResponse(
             ip=client_ip,
             limit="100/minute",  # Default limit for most endpoints
             remaining=100,  # Unknown, return max
-            reset_in_seconds=60
+            reset_in_seconds=60,
         )
     except Exception as e:
         logger.error(f"Error getting rate limit status: {e}")
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get rate limit status: {str(e)}"
+            status_code=500, detail=f"Failed to get rate limit status: {str(e)}"
         )
 
 
@@ -544,37 +518,37 @@ async def get_rate_limit_status(request: Request):
     "/predict/ab",
     response_model=ABPredictResponse,
     tags=["Prediction", "A/B Testing"],
-    summary="Predict with A/B testing"
+    summary="Predict with A/B testing",
 )
 @limiter.limit("100/minute")
 async def predict_sentiment_ab(
     request: Request,
     predict_request: PredictRequest,
     redis: Optional[RedisCache] = Depends(get_redis),
-    db: Optional[AsyncSession] = Depends(get_db)
+    db: Optional[AsyncSession] = Depends(get_db),
 ):
     """
     Analyze sentiment with A/B testing (50/50 split between model versions).
-    
+
     Returns prediction plus which model version was used.
     """
     request_start = time.perf_counter()
-    
+
     # Select model version for A/B test
     model_version = ab_router.select_model_version()
     model = ab_router.get_model_for_version(model_version)
-    
+
     cache_hit = False
     sentiment = None
     confidence = None
     latency_ms = None
-    
+
     try:
         # Try cache first (include model version in cache key)
         if redis is not None:
             cache_key = f"sentiment:{model_version}:{redis.generate_cache_key(predict_request.text).split(':', 1)[1]}"
             cached_result = await redis.get(cache_key)
-            
+
             if cached_result is not None:
                 try:
                     cached_data = json.loads(cached_result)
@@ -588,23 +562,23 @@ async def predict_sentiment_ab(
                 except Exception as cache_error:
                     logger.error(f"Error parsing cached result: {cache_error}")
                     cached_result = None
-        
+
         # Cache miss - run model prediction
         if not cache_hit:
             model_start = time.perf_counter()
             result = model.predict(predict_request.text)
             model_end = time.perf_counter()
             latency_ms = round((model_end - model_start) * 1000, 2)
-            
+
             sentiment_map = {
                 "POSITIVE": "positive",
                 "NEGATIVE": "negative",
-                "NEUTRAL": "neutral"
+                "NEUTRAL": "neutral",
             }
-            
+
             sentiment = sentiment_map.get(result["label"].upper(), "neutral")
             confidence = round(result["score"], 4)
-            
+
             # Cache the result
             if redis is not None:
                 try:
@@ -613,10 +587,10 @@ async def predict_sentiment_ab(
                     await redis.set(cache_key, json.dumps(cache_data), ttl=3600)
                 except Exception as cache_error:
                     logger.error(f"Failed to cache result: {cache_error}")
-            
+
             track_cache_miss()
             track_prediction(sentiment, model_version)
-        
+
         # Log to database with model version
         if db is not None:
             try:
@@ -626,26 +600,26 @@ async def predict_sentiment_ab(
                     confidence_score=confidence,
                     latency_ms=latency_ms,
                     model_version=model_version,
-                    cache_hit=cache_hit
+                    cache_hit=cache_hit,
                 )
                 db.add(prediction)
                 await db.commit()
             except Exception as db_error:
                 logger.error(f"Failed to log prediction: {db_error}")
                 await db.rollback()
-        
+
         # Track request metrics with model version
         request_latency = time.perf_counter() - request_start
         track_request("/predict/ab", 200, request_latency, model_version)
-        
+
         return ABPredictResponse(
             sentiment=sentiment,
             confidence=confidence,
             latency_ms=latency_ms,
             cache_hit=cache_hit,
-            model_version=model_version
+            model_version=model_version,
         )
-        
+
     except ValueError as e:
         logger.error(f"Validation error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
@@ -658,95 +632,123 @@ async def predict_sentiment_ab(
     "/ab/comparison",
     response_model=ABComparisonResponse,
     tags=["A/B Testing"],
-    summary="Compare A/B test results"
+    summary="Compare A/B test results",
 )
 @limiter.limit("60/minute")
-async def get_ab_comparison(
-    request: Request,
-    db: AsyncSession = Depends(get_db)
-):
+async def get_ab_comparison(request: Request, db: AsyncSession = Depends(get_db)):
     """
     Get comparison statistics between model versions.
     Analyzes predictions from A/B testing to compare performance.
     """
     try:
         # Query predictions for v1
-        v1_query = select(
-            func.count(Prediction.id).label('total'),
-            func.avg(Prediction.confidence_score).label('avg_confidence'),
-            func.avg(Prediction.latency_ms).label('avg_latency'),
-            Prediction.predicted_sentiment,
-            func.count(Prediction.predicted_sentiment).label('sentiment_count')
-        ).where(
-            Prediction.model_version == 'v1'
-        ).group_by(Prediction.predicted_sentiment)
-        
+        v1_query = (
+            select(
+                func.count(Prediction.id).label("total"),
+                func.avg(Prediction.confidence_score).label("avg_confidence"),
+                func.avg(Prediction.latency_ms).label("avg_latency"),
+                Prediction.predicted_sentiment,
+                func.count(Prediction.predicted_sentiment).label("sentiment_count"),
+            )
+            .where(Prediction.model_version == "v1")
+            .group_by(Prediction.predicted_sentiment)
+        )
+
         v1_results = await db.execute(v1_query)
         v1_data = v1_results.all()
-        
+
         # Query predictions for v2
-        v2_query = select(
-            func.count(Prediction.id).label('total'),
-            func.avg(Prediction.confidence_score).label('avg_confidence'),
-            func.avg(Prediction.latency_ms).label('avg_latency'),
-            Prediction.predicted_sentiment,
-            func.count(Prediction.predicted_sentiment).label('sentiment_count')
-        ).where(
-            Prediction.model_version == 'v2'
-        ).group_by(Prediction.predicted_sentiment)
-        
+        v2_query = (
+            select(
+                func.count(Prediction.id).label("total"),
+                func.avg(Prediction.confidence_score).label("avg_confidence"),
+                func.avg(Prediction.latency_ms).label("avg_latency"),
+                Prediction.predicted_sentiment,
+                func.count(Prediction.predicted_sentiment).label("sentiment_count"),
+            )
+            .where(Prediction.model_version == "v2")
+            .group_by(Prediction.predicted_sentiment)
+        )
+
         v2_results = await db.execute(v2_query)
         v2_data = v2_results.all()
-        
+
         # Process v1 stats
         v1_total = sum(row.sentiment_count for row in v1_data)
-        v1_sentiment_dist = {row.predicted_sentiment: row.sentiment_count for row in v1_data}
-        v1_avg_conf = sum(row.avg_confidence * row.sentiment_count for row in v1_data) / v1_total if v1_total > 0 else 0
-        v1_avg_lat = sum(row.avg_latency * row.sentiment_count for row in v1_data) / v1_total if v1_total > 0 else 0
-        
+        v1_sentiment_dist = {
+            row.predicted_sentiment: row.sentiment_count for row in v1_data
+        }
+        v1_avg_conf = (
+            sum(row.avg_confidence * row.sentiment_count for row in v1_data) / v1_total
+            if v1_total > 0
+            else 0
+        )
+        v1_avg_lat = (
+            sum(row.avg_latency * row.sentiment_count for row in v1_data) / v1_total
+            if v1_total > 0
+            else 0
+        )
+
         # Process v2 stats
         v2_total = sum(row.sentiment_count for row in v2_data)
-        v2_sentiment_dist = {row.predicted_sentiment: row.sentiment_count for row in v2_data}
-        v2_avg_conf = sum(row.avg_confidence * row.sentiment_count for row in v2_data) / v2_total if v2_total > 0 else 0
-        v2_avg_lat = sum(row.avg_latency * row.sentiment_count for row in v2_data) / v2_total if v2_total > 0 else 0
-        
+        v2_sentiment_dist = {
+            row.predicted_sentiment: row.sentiment_count for row in v2_data
+        }
+        v2_avg_conf = (
+            sum(row.avg_confidence * row.sentiment_count for row in v2_data) / v2_total
+            if v2_total > 0
+            else 0
+        )
+        v2_avg_lat = (
+            sum(row.avg_latency * row.sentiment_count for row in v2_data) / v2_total
+            if v2_total > 0
+            else 0
+        )
+
         # Ensure all sentiments are present
         for sent in ["positive", "negative", "neutral"]:
             v1_sentiment_dist.setdefault(sent, 0)
             v2_sentiment_dist.setdefault(sent, 0)
-        
+
         # Calculate comparison metrics
         total_predictions = v1_total + v2_total
         traffic_dist = {
-            "v1": round((v1_total / total_predictions * 100), 2) if total_predictions > 0 else 0,
-            "v2": round((v2_total / total_predictions * 100), 2) if total_predictions > 0 else 0
+            "v1": (
+                round((v1_total / total_predictions * 100), 2)
+                if total_predictions > 0
+                else 0
+            ),
+            "v2": (
+                round((v2_total / total_predictions * 100), 2)
+                if total_predictions > 0
+                else 0
+            ),
         }
-        
+
         return ABComparisonResponse(
             model_v1=ModelStats(
                 total_predictions=v1_total,
                 avg_confidence=round(v1_avg_conf, 4),
                 avg_latency_ms=round(v1_avg_lat, 2),
-                sentiment_distribution=v1_sentiment_dist
+                sentiment_distribution=v1_sentiment_dist,
             ),
             model_v2=ModelStats(
                 total_predictions=v2_total,
                 avg_confidence=round(v2_avg_conf, 4),
                 avg_latency_ms=round(v2_avg_lat, 2),
-                sentiment_distribution=v2_sentiment_dist
+                sentiment_distribution=v2_sentiment_dist,
             ),
             comparison=ComparisonStats(
                 confidence_diff=round(v2_avg_conf - v1_avg_conf, 4),
                 latency_diff=round(v2_avg_lat - v1_avg_lat, 2),
                 sample_size_sufficient=(v1_total >= 100 and v2_total >= 100),
-                traffic_distribution=traffic_dist
-            )
+                traffic_distribution=traffic_dist,
+            ),
         )
     except Exception as e:
         logger.error(f"Error getting A/B comparison: {e}")
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get A/B comparison: {str(e)}"
+            status_code=500, detail=f"Failed to get A/B comparison: {str(e)}"
         )
 
 
@@ -754,11 +756,7 @@ async def get_ab_comparison(
 async def value_error_handler(request: Request, exc: ValueError):
     """Handle ValueError exceptions"""
     return JSONResponse(
-        status_code=400,
-        content={
-            "detail": str(exc),
-            "error_type": "ValueError"
-        }
+        status_code=400, content={"detail": str(exc), "error_type": "ValueError"}
     )
 
 
@@ -767,11 +765,7 @@ async def general_exception_handler(request: Request, exc: Exception):
     """Handle general exceptions"""
     logger.error(f"Unhandled exception: {exc}")
     return JSONResponse(
-        status_code=500,
-        content={
-            "detail": str(exc),
-            "error_type": type(exc).__name__
-        }
+        status_code=500, content={"detail": str(exc), "error_type": type(exc).__name__}
     )
 
 
@@ -786,13 +780,15 @@ async def startup_event():
         model_v2 = SentimentModel.get_model("v2")
         logger.info(f"Model v1 loaded: {model_v1.is_loaded}")
         logger.info(f"Model v2 loaded: {model_v2.is_loaded}")
-        
+
         # Initialize database tables
         try:
             await init_db()
             logger.info("Database initialized")
         except Exception as db_error:
-            logger.warning(f"Database initialization failed (will continue without DB): {db_error}")
+            logger.warning(
+                f"Database initialization failed (will continue without DB): {db_error}"
+            )
     except Exception as e:
         logger.error(f"Failed to initialize on startup: {e}")
 
@@ -806,4 +802,3 @@ async def shutdown_event():
         await close_db()
     except Exception as e:
         logger.error(f"Error during shutdown: {e}")
-

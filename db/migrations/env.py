@@ -18,7 +18,7 @@ config = context.config
 # Get database URL from environment variable
 database_url = os.getenv(
     "DATABASE_URL",
-    "postgresql+asyncpg://mlapi_user:mlapi_password@localhost:5432/mlapi"
+    "postgresql+asyncpg://mlapi_user:mlapi_password@localhost:5432/mlapi",
 )
 config.set_main_option("sqlalchemy.url", database_url)
 
@@ -75,9 +75,7 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection, target_metadata=target_metadata
-        )
+        context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
             context.run_migrations()
@@ -85,27 +83,24 @@ def run_migrations_online() -> None:
 
 def run_async_migrations() -> None:
     """Run migrations in async mode for asyncpg."""
-    
+
     async def do_run_migrations():
         connectable = async_engine_from_config(
             config.get_section(config.config_ini_section, {}),
             prefix="sqlalchemy.",
             poolclass=pool.NullPool,
         )
-        
+
         async with connectable.connect() as connection:
             await connection.run_sync(do_migrations)
-        
+
         await connectable.dispose()
-    
+
     def do_migrations(connection):
-        context.configure(
-            connection=connection,
-            target_metadata=target_metadata
-        )
+        context.configure(connection=connection, target_metadata=target_metadata)
         with context.begin_transaction():
             context.run_migrations()
-    
+
     asyncio.run(do_run_migrations())
 
 
