@@ -1,6 +1,6 @@
 """
 Production ML API - Main FastAPI Application
-Sentiment analysis API with full observability and rate limiting
+Sentiment analysis API with full observability
 """
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -62,7 +62,7 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# Add rate limiter to app
+# Add rate limiter to app state
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -115,12 +115,10 @@ async def health_check(
     is_healthy = True
     
     try:
-        # Check model - verify it exists in instances without creating new one
-        health_status["model_loaded"] = (
-            "v1" in SentimentModel._instances and 
-            SentimentModel._instances["v1"].is_loaded
-        )
-        if not health_status["model_loaded"]:
+        # Check model
+        model = SentimentModel.get_model()
+        health_status["model_loaded"] = model.is_loaded
+        if not model.is_loaded:
             is_healthy = False
         
         # Check database
@@ -232,8 +230,8 @@ async def predict_sentiment(
             # Time the model prediction
             model_start = time.perf_counter()
             
-            # Get prediction from model (use async version for Docker compatibility)
-            result = await model.predict_async(predict_request.text)
+            # Get prediction from model
+            result = model.predict(predict_request.text)
             
             # Calculate latency
             model_end = time.perf_counter()
@@ -372,7 +370,7 @@ async def batch_predict_sentiment(
             # Cache miss - run model prediction
             if not cache_hit:
                 start_time = time.perf_counter()
-                result = await model.predict_async(text)
+                result = model.predict(text)
                 end_time = time.perf_counter()
                 latency_ms = round((end_time - start_time) * 1000, 2)
                 
@@ -508,12 +506,25 @@ async def get_rate_limit_status(request: Request):
     Note: This endpoint itself is not rate limited.
     """
     try:
+        # Get client IP
         client_ip = get_remote_address(request)
         
+        # Get rate limit info from slowapi
+        # slowapi stores limits in request state
+        rate_limit_headers = {}
+        if hasattr(request.state, "view_rate_limit"):
+            limit_info = request.state.view_rate_limit
+            rate_limit_headers = {
+                "limit": str(limit_info),
+                "remaining": getattr(request.state, "remaining", 0),
+                "reset": getattr(request.state, "reset", 0)
+            }
+        
+        # Default response if no rate limit info available
         return RateLimitStatusResponse(
             ip=client_ip,
             limit="100/minute",  # Default limit for most endpoints
-            remaining=100,  # Approximate - slowapi doesn't expose this easily
+            remaining=100,  # Unknown, return max
             reset_in_seconds=60
         )
     except Exception as e:
@@ -576,7 +587,7 @@ async def predict_sentiment_ab(
         # Cache miss - run model prediction
         if not cache_hit:
             model_start = time.perf_counter()
-            result = await model.predict_async(predict_request.text)
+            result = model.predict(predict_request.text)
             model_end = time.perf_counter()
             latency_ms = round((model_end - model_start) * 1000, 2)
             
@@ -762,11 +773,10 @@ async def general_exception_handler(request: Request, exc: Exception):
 # Startup event
 @app.on_event("startup")
 async def startup_event():
-    """Initialize models and database on startup"""
+    """Initialize model and database on startup"""
     logger.info("Starting Production ML API...")
     try:
-        # Eagerly load both model versions at startup
-        logger.info("Preloading models...")
+        # Load ML models (v1 and v2) for A/B testing readiness
         model_v1 = SentimentModel.get_model("v1")
         model_v2 = SentimentModel.get_model("v2")
         logger.info(f"Model v1 loaded: {model_v1.is_loaded}")

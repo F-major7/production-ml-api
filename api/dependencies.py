@@ -22,8 +22,7 @@ def get_model() -> SentimentModel:
         HTTPException: If model fails to load
     """
     try:
-        # Use get_model() class method to get singleton instance
-        model = SentimentModel.get_model("v1")
+        model = SentimentModel.get_model()
         if not model.is_loaded:
             logger.error("Model is not loaded")
             raise HTTPException(

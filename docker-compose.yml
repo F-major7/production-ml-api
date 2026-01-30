@@ -10,37 +10,24 @@ services:
       DATABASE_URL: postgresql+asyncpg://mlapi_user:mlapi_password@postgres:5432/mlapi
       REDIS_URL: redis://redis:6379/0
       LOG_LEVEL: INFO
-      # PyTorch threading - testing with 4 threads for better performance
+      DISABLE_MKLDNN: "1"
       OMP_NUM_THREADS: "4"
       MKL_NUM_THREADS: "4"
-      NUMEXPR_NUM_THREADS: "4"
-      OPENBLAS_NUM_THREADS: "4"
-      # HuggingFace tokenizer parallelism fix
-      TOKENIZERS_PARALLELISM: "false"
-      # Disable uvloop - incompatible with PyTorch in Docker
-      UVLOOP_DISABLE: "1"
+      TORCH_NUM_THREADS: "4"
+      TORCH_NUM_INTEROP_THREADS: "1"
     ports:
       - "8000:8000"
-    shm_size: '8gb'
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-        reservations:
-          memory: 1G
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    # Health check disabled - triggers segfault in Docker environment
-    # Prometheus /metrics endpoint provides monitoring instead
-    # healthcheck:
-    #   test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-    #   interval: 30s
-    #   timeout: 3s
-    #   start_period: 40s
-    #   retries: 3
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 3s
+      start_period: 40s
+      retries: 3
     restart: unless-stopped
     networks:
       - mlapi_network
@@ -115,12 +102,13 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana-datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
+      - ./monitoring/grafana-dashboard.yml:/etc/grafana/provisioning/dashboards/dashboard.yml
+      - ./monitoring/grafana-dashboard.json:/var/lib/grafana/dashboards/grafana-dashboard.json
     depends_on:
       prometheus:
         condition: service_healthy
-      # Removed api health check dependency since api no longer has health check
       api:
-        condition: service_started
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: 10s

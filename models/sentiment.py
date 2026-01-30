@@ -1,44 +1,15 @@
 """
 Sentiment Analysis Model Wrapper
 Supports multiple model versions for A/B testing
-
-NOTE: Docker-compatible version with multi-threaded PyTorch (testing).
 """
 from typing import Dict, Optional
+import os
+import torch
 from transformers import pipeline
 import logging
-import torch
-import gc
-import asyncio
-import os
-import threading
-from concurrent.futures import ThreadPoolExecutor
-
-# Set PyTorch threading - trying 4 threads for better performance
-# If this causes segfaults, revert to 1
-torch.set_num_threads(4)
-torch.set_num_interop_threads(2)
-
-# Disable CUDA backends (not needed for CPU-only)
-if hasattr(torch.backends, 'cudnn'):
-    torch.backends.cudnn.enabled = False
-
-# Set environment variables for threading
-os.environ['OMP_NUM_THREADS'] = '4'
-os.environ['MKL_NUM_THREADS'] = '4'
-os.environ['OPENBLAS_NUM_THREADS'] = '4'
-os.environ['VECLIB_MAXIMUM_THREADS'] = '4'
-os.environ['NUMEXPR_NUM_THREADS'] = '4'
-os.environ['CUDA_VISIBLE_DEVICES'] = ''  # Hide all CUDA devices
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# Thread pool for running inference (2 workers for better throughput)
-_inference_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="torch_infer")
-
-# Lock to ensure only one inference at a time (prevent concurrent model access)
-_inference_lock = threading.Lock()
 
 
 class SentimentModel:
@@ -48,6 +19,7 @@ class SentimentModel:
     Uses DistilBERT fine-tuned on SST-2 for sentiment classification.
     """
     _instances: Dict[str, 'SentimentModel'] = {}
+    _threads_configured: bool = False
     
     def __init__(self, version: str = "v1"):
         """
@@ -85,95 +57,40 @@ class SentimentModel:
         """
         if self._pipeline is None:
             try:
+                self._configure_torch_threads()
+                if os.getenv("DISABLE_MKLDNN") == "1":
+                    torch.backends.mkldnn.enabled = False
+                    logger.info("MKLDNN disabled via DISABLE_MKLDNN=1")
                 logger.info(f"Loading sentiment analysis model (version: {self.version})...")
-                from transformers import AutoTokenizer, AutoModelForSequenceClassification
-                import torch.nn.functional as F
-                
-                model_name = "distilbert-base-uncased-finetuned-sst-2-english"
-                
-                # Load tokenizer with use_fast=False to avoid Rust tokenizer segfaults
-                self._tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=False)
-                self._model = AutoModelForSequenceClassification.from_pretrained(
-                    model_name,
-                    torchscript=False  # Disable torchscript
+                self._pipeline = pipeline(
+                    "sentiment-analysis",
+                    model="distilbert-base-uncased-finetuned-sst-2-english"
                 )
-                self._model.cpu()  # Explicitly move to CPU
-                self._model.eval()  # Set to evaluation mode
-                
-                # Disable gradient computation globally for this model
-                for param in self._model.parameters():
-                    param.requires_grad = False
-                
-                # Store a dummy pipeline reference to maintain is_loaded compatibility
-                self._pipeline = True  # Just a flag, we use _model and _tokenizer directly
-                
-                logger.info(f"Model {self.version} loaded successfully (direct mode)")
+                logger.info(f"Model {self.version} loaded successfully")
             except Exception as e:
                 logger.error(f"Failed to load model {self.version}: {e}")
                 raise RuntimeError(f"Model initialization failed: {e}")
-    
-    def _run_inference(self, text: str) -> Dict[str, any]:
-        """
-        Internal method to run inference synchronously.
-        Called from thread pool to avoid async/PyTorch conflicts.
-        Uses lock to ensure only one inference at a time.
-        Bypasses pipeline and runs model directly for Docker stability.
-        """
-        import torch.nn.functional as F
-        
-        logger.info(f"[INFERENCE] Waiting for lock, text length: {len(text)}")
-        
-        with _inference_lock:
-            logger.info("[INFERENCE] Lock acquired, starting inference")
-            try:
-                # Tokenize
-                logger.info("[INFERENCE] Tokenizing...")
-                inputs = self._tokenizer(
-                    text, 
-                    return_tensors="pt", 
-                    truncation=True, 
-                    max_length=512,
-                    padding=True
-                )
-                logger.info(f"[INFERENCE] Tokenized: {inputs.keys()}")
-                
-                # Move inputs to CPU explicitly
-                inputs = {k: v.cpu() for k, v in inputs.items()}
-                logger.info(f"[INFERENCE] Inputs on device: {inputs['input_ids'].device}")
-                
-                # Run model with inference_mode (more efficient than no_grad)
-                logger.info("[INFERENCE] Running model forward pass...")
-                with torch.inference_mode():
-                    outputs = self._model(**inputs)
-                    logits = outputs.logits.cpu()  # Ensure output is on CPU
-                    logger.info(f"[INFERENCE] Model output logits shape: {logits.shape}")
-                
-                # Get prediction
-                logger.info("[INFERENCE] Computing probabilities...")
-                probs = F.softmax(logits, dim=-1)
-                predicted_class = torch.argmax(probs, dim=-1).item()
-                confidence = probs[0][predicted_class].item()
-                
-                # Map class to label (0=NEGATIVE, 1=POSITIVE for this model)
-                label = "POSITIVE" if predicted_class == 1 else "NEGATIVE"
-                
-                gc.collect()
-                
-                output = {
-                    "label": label,
-                    "score": confidence
-                }
-                logger.info(f"[INFERENCE] Success: {output}")
-                return output
-            except Exception as e:
-                logger.error(f"[INFERENCE] Exception: {type(e).__name__}: {e}")
-                import traceback
-                logger.error(f"[INFERENCE] Traceback: {traceback.format_exc()}")
-                raise
+
+    @classmethod
+    def _configure_torch_threads(cls) -> None:
+        if cls._threads_configured:
+            return
+        num_threads = os.getenv("TORCH_NUM_THREADS")
+        interop_threads = os.getenv("TORCH_NUM_INTEROP_THREADS")
+        try:
+            if num_threads:
+                torch.set_num_threads(int(num_threads))
+                logger.info(f"Torch num_threads set to {num_threads}")
+            if interop_threads:
+                torch.set_num_interop_threads(int(interop_threads))
+                logger.info(f"Torch num_interop_threads set to {interop_threads}")
+        except ValueError as exc:
+            logger.warning(f"Invalid torch thread settings: {exc}")
+        cls._threads_configured = True
     
     def predict(self, text: str) -> Dict[str, any]:
         """
-        Predict sentiment for given text (synchronous version).
+        Predict sentiment for given text.
         
         Args:
             text: Input text to analyze
@@ -192,45 +109,15 @@ class SentimentModel:
             raise ValueError("Text cannot be empty")
         
         try:
-            return self._run_inference(text)
+            # Pipeline returns list with single result for single input
+            with torch.inference_mode():
+                result = self._pipeline(text)[0]
+            return {
+                "label": result["label"],
+                "score": result["score"]
+            }
         except Exception as e:
             logger.error(f"Prediction error: {e}")
-            raise RuntimeError(f"Prediction failed: {e}")
-    
-    async def predict_async(self, text: str) -> Dict[str, any]:
-        """
-        Predict sentiment for given text (async-safe version).
-        Runs inference in thread pool to avoid uvloop/PyTorch conflicts.
-        
-        Args:
-            text: Input text to analyze
-            
-        Returns:
-            Dictionary with 'label' (POSITIVE/NEGATIVE) and 'score' (confidence)
-            
-        Raises:
-            RuntimeError: If model is not loaded
-            ValueError: If text is invalid
-        """
-        if self._pipeline is None:
-            raise RuntimeError("Model not loaded")
-        
-        if not text or not text.strip():
-            raise ValueError("Text cannot be empty")
-        
-        try:
-            logger.info(f"Starting async prediction for text: {text[:50]}...")
-            # Run inference in thread pool to avoid async event loop conflicts
-            loop = asyncio.get_running_loop()
-            result = await loop.run_in_executor(
-                _inference_executor,
-                self._run_inference,
-                text
-            )
-            logger.info(f"Prediction complete: {result}")
-            return result
-        except Exception as e:
-            logger.error(f"Async prediction error: {e}")
             raise RuntimeError(f"Prediction failed: {e}")
     
     @property
