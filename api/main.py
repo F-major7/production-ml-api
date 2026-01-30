@@ -236,8 +236,8 @@ async def predict_sentiment(
             # Time the model prediction
             model_start = time.perf_counter()
             
-            # Get prediction from model
-            result = model.predict(predict_request.text)
+            # Get prediction from model (use async version for Docker compatibility)
+            result = await model.predict_async(predict_request.text)
             
             # Calculate latency
             model_end = time.perf_counter()
@@ -376,7 +376,7 @@ async def batch_predict_sentiment(
             # Cache miss - run model prediction
             if not cache_hit:
                 start_time = time.perf_counter()
-                result = model.predict(text)
+                result = await model.predict_async(text)
                 end_time = time.perf_counter()
                 latency_ms = round((end_time - start_time) * 1000, 2)
                 
@@ -554,7 +554,7 @@ async def predict_sentiment_ab(
         # Cache miss - run model prediction
         if not cache_hit:
             model_start = time.perf_counter()
-            result = model.predict(predict_request.text)
+            result = await model.predict_async(predict_request.text)
             model_end = time.perf_counter()
             latency_ms = round((model_end - model_start) * 1000, 2)
             

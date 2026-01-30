@@ -17,6 +17,8 @@ services:
       OPENBLAS_NUM_THREADS: "1"
       # HuggingFace tokenizer parallelism fix
       TOKENIZERS_PARALLELISM: "false"
+      # Disable uvloop - incompatible with PyTorch in Docker
+      UVLOOP_DISABLE: "1"
     ports:
       - "8000:8000"
     shm_size: '8gb'

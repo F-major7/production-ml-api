@@ -1,15 +1,48 @@
 """
 Sentiment Analysis Model Wrapper
 Supports multiple model versions for A/B testing
+
+NOTE: Docker-compatible version with single-threaded PyTorch.
 """
 from typing import Dict, Optional
 from transformers import pipeline
 import logging
 import torch
 import gc
+import asyncio
+import os
+import threading
+from concurrent.futures import ThreadPoolExecutor
+
+# CRITICAL: Set PyTorch to single-threaded BEFORE any torch operations
+# This must happen before pipeline/model loading
+torch.set_num_threads(1)
+torch.set_num_interop_threads(1)
+
+# Disable all backends that might cause Docker issues
+if hasattr(torch.backends, 'cudnn'):
+    torch.backends.cudnn.enabled = False
+if hasattr(torch.backends, 'mkl'):
+    torch.backends.mkl.is_available = lambda: False
+if hasattr(torch.backends, 'mkldnn'):
+    torch.backends.mkldnn.is_available = lambda: False
+
+# Also set via environment (backup for subprocess/forks)
+os.environ['OMP_NUM_THREADS'] = '1'
+os.environ['MKL_NUM_THREADS'] = '1'
+os.environ['OPENBLAS_NUM_THREADS'] = '1'
+os.environ['VECLIB_MAXIMUM_THREADS'] = '1'
+os.environ['NUMEXPR_NUM_THREADS'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = ''  # Hide all CUDA devices
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Thread pool for running inference (single worker only)
+_inference_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="torch_infer")
+
+# Lock to ensure only one inference at a time (prevent concurrent model access)
+_inference_lock = threading.Lock()
 
 
 class SentimentModel:
@@ -57,20 +90,94 @@ class SentimentModel:
         if self._pipeline is None:
             try:
                 logger.info(f"Loading sentiment analysis model (version: {self.version})...")
-                # Force CPU device to avoid CUDA/GPU issues in Docker
-                self._pipeline = pipeline(
-                    "sentiment-analysis",
-                    model="distilbert-base-uncased-finetuned-sst-2-english",
-                    device=-1  # -1 forces CPU, avoids CUDA/GPU segfaults
+                from transformers import AutoTokenizer, AutoModelForSequenceClassification
+                import torch.nn.functional as F
+                
+                model_name = "distilbert-base-uncased-finetuned-sst-2-english"
+                
+                # Load tokenizer with use_fast=False to avoid Rust tokenizer segfaults
+                self._tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=False)
+                self._model = AutoModelForSequenceClassification.from_pretrained(
+                    model_name,
+                    torchscript=False  # Disable torchscript
                 )
-                logger.info(f"Model {self.version} loaded successfully")
+                self._model.cpu()  # Explicitly move to CPU
+                self._model.eval()  # Set to evaluation mode
+                
+                # Disable gradient computation globally for this model
+                for param in self._model.parameters():
+                    param.requires_grad = False
+                
+                # Store a dummy pipeline reference to maintain is_loaded compatibility
+                self._pipeline = True  # Just a flag, we use _model and _tokenizer directly
+                
+                logger.info(f"Model {self.version} loaded successfully (direct mode)")
             except Exception as e:
                 logger.error(f"Failed to load model {self.version}: {e}")
                 raise RuntimeError(f"Model initialization failed: {e}")
     
+    def _run_inference(self, text: str) -> Dict[str, any]:
+        """
+        Internal method to run inference synchronously.
+        Called from thread pool to avoid async/PyTorch conflicts.
+        Uses lock to ensure only one inference at a time.
+        Bypasses pipeline and runs model directly for Docker stability.
+        """
+        import torch.nn.functional as F
+        
+        logger.info(f"[INFERENCE] Waiting for lock, text length: {len(text)}")
+        
+        with _inference_lock:
+            logger.info("[INFERENCE] Lock acquired, starting inference")
+            try:
+                # Tokenize
+                logger.info("[INFERENCE] Tokenizing...")
+                inputs = self._tokenizer(
+                    text, 
+                    return_tensors="pt", 
+                    truncation=True, 
+                    max_length=512,
+                    padding=True
+                )
+                logger.info(f"[INFERENCE] Tokenized: {inputs.keys()}")
+                
+                # Move inputs to CPU explicitly
+                inputs = {k: v.cpu() for k, v in inputs.items()}
+                logger.info(f"[INFERENCE] Inputs on device: {inputs['input_ids'].device}")
+                
+                # Run model with inference_mode (more efficient than no_grad)
+                logger.info("[INFERENCE] Running model forward pass...")
+                with torch.inference_mode():
+                    outputs = self._model(**inputs)
+                    logits = outputs.logits.cpu()  # Ensure output is on CPU
+                    logger.info(f"[INFERENCE] Model output logits shape: {logits.shape}")
+                
+                # Get prediction
+                logger.info("[INFERENCE] Computing probabilities...")
+                probs = F.softmax(logits, dim=-1)
+                predicted_class = torch.argmax(probs, dim=-1).item()
+                confidence = probs[0][predicted_class].item()
+                
+                # Map class to label (0=NEGATIVE, 1=POSITIVE for this model)
+                label = "POSITIVE" if predicted_class == 1 else "NEGATIVE"
+                
+                gc.collect()
+                
+                output = {
+                    "label": label,
+                    "score": confidence
+                }
+                logger.info(f"[INFERENCE] Success: {output}")
+                return output
+            except Exception as e:
+                logger.error(f"[INFERENCE] Exception: {type(e).__name__}: {e}")
+                import traceback
+                logger.error(f"[INFERENCE] Traceback: {traceback.format_exc()}")
+                raise
+    
     def predict(self, text: str) -> Dict[str, any]:
         """
-        Predict sentiment for given text.
+        Predict sentiment for given text (synchronous version).
         
         Args:
             text: Input text to analyze
@@ -89,20 +196,45 @@ class SentimentModel:
             raise ValueError("Text cannot be empty")
         
         try:
-            # Use torch.no_grad() for inference to save memory and prevent crashes
-            with torch.no_grad():
-                # Pipeline returns list with single result for single input
-                result = self._pipeline(text)[0]
-            
-            # Explicit garbage collection to prevent memory leaks in Docker
-            gc.collect()
-            
-            return {
-                "label": result["label"],
-                "score": result["score"]
-            }
+            return self._run_inference(text)
         except Exception as e:
             logger.error(f"Prediction error: {e}")
+            raise RuntimeError(f"Prediction failed: {e}")
+    
+    async def predict_async(self, text: str) -> Dict[str, any]:
+        """
+        Predict sentiment for given text (async-safe version).
+        Runs inference in thread pool to avoid uvloop/PyTorch conflicts.
+        
+        Args:
+            text: Input text to analyze
+            
+        Returns:
+            Dictionary with 'label' (POSITIVE/NEGATIVE) and 'score' (confidence)
+            
+        Raises:
+            RuntimeError: If model is not loaded
+            ValueError: If text is invalid
+        """
+        if self._pipeline is None:
+            raise RuntimeError("Model not loaded")
+        
+        if not text or not text.strip():
+            raise ValueError("Text cannot be empty")
+        
+        try:
+            logger.info(f"Starting async prediction for text: {text[:50]}...")
+            # Run inference in thread pool to avoid async event loop conflicts
+            loop = asyncio.get_running_loop()
+            result = await loop.run_in_executor(
+                _inference_executor,
+                self._run_inference,
+                text
+            )
+            logger.info(f"Prediction complete: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Async prediction error: {e}")
             raise RuntimeError(f"Prediction failed: {e}")
     
     @property
