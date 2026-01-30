@@ -1,0 +1,309 @@
+mlapi_api  | /home/apiuser/.local/lib/python3.11/site-packages/pydantic/_internal/_fields.py:149: UserWarning: Field "model_loaded" has conflict with protected namespace "model_".
+mlapi_api  | 
+mlapi_api  | You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+mlapi_api  |   warnings.warn(
+mlapi_api  | /home/apiuser/.local/lib/python3.11/site-packages/pydantic/_internal/_fields.py:149: UserWarning: Field "model_version" has conflict with protected namespace "model_".
+mlapi_api  | 
+mlapi_api  | You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+mlapi_api  |   warnings.warn(
+mlapi_api  | /home/apiuser/.local/lib/python3.11/site-packages/pydantic/_internal/_fields.py:149: UserWarning: Field "model_v1" has conflict with protected namespace "model_".
+mlapi_api  | 
+mlapi_api  | You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+mlapi_api  |   warnings.warn(
+mlapi_api  | /home/apiuser/.local/lib/python3.11/site-packages/pydantic/_internal/_fields.py:149: UserWarning: Field "model_v2" has conflict with protected namespace "model_".
+mlapi_api  | 
+mlapi_api  | You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+mlapi_api  |   warnings.warn(
+mlapi_api  | INFO:     Started server process [1]
+mlapi_api  | INFO:     Waiting for application startup.
+mlapi_api  | INFO:api.main:Starting Production ML API...
+mlapi_api  | INFO:api.main:Preloading models...
+mlapi_api  | INFO:models.sentiment:Creating new model instance for version: v1
+mlapi_api  | INFO:models.sentiment:Loading sentiment analysis model (version: v1)...
+mlapi_api  | Downloading config.json:   0%|          | 0.00/629 [00:00<?, ?B/s]Downloading config.json: 100%|██████████| 629/629 [00:00<00:00, 7.74MB/s]
+mlapi_api  | Downloading model.safetensors:   0%|          | 0.00/268M [00:00<?, ?B/s]Downloading model.safetensors:   4%|▍         | 10.5M/268M [00:00<00:08, 31.6MB/s]Downloading model.safetensors:   8%|▊         | 21.0M/268M [00:00<00:06, 36.7MB/s]Downloading model.safetensors:  12%|█▏        | 31.5M/268M [00:00<00:06, 37.4MB/s]Downloading model.safetensors:  16%|█▌        | 41.9M/268M [00:01<00:05, 39.8MB/s]Downloading model.safetensors:  20%|█▉        | 52.4M/268M [00:01<00:05, 39.5MB/s]Downloading model.safetensors:  23%|██▎       | 62.9M/268M [00:01<00:05, 40.7MB/s]Downloading model.safetensors:  27%|██▋       | 73.4M/268M [00:01<00:05, 38.7MB/s]Downloading model.safetensors:  31%|███▏      | 83.9M/268M [00:02<00:04, 39.9MB/s]Downloading model.safetensors:  35%|███▌      | 94.4M/268M [00:02<00:04, 38.2MB/s]Downloading model.safetensors:  39%|███▉      | 105M/268M [00:02<00:04, 38.8MB/s] Downloading model.safetensors:  43%|████▎     | 115M/268M [00:03<00:04, 36.4MB/s]Downloading model.safetensors:  47%|████▋     | 126M/268M [00:03<00:03, 38.2MB/s]Downloading model.safetensors:  51%|█████     | 136M/268M [00:03<00:03, 38.7MB/s]Downloading model.safetensors:  55%|█████▍    | 147M/268M [00:03<00:03, 39.2MB/s]Downloading model.safetensors:  59%|█████▊    | 157M/268M [00:04<00:02, 38.5MB/s]Downloading model.safetensors:  63%|██████▎   | 168M/268M [00:04<00:02, 38.5MB/s]Downloading model.safetensors:  67%|██████▋   | 178M/268M [00:04<00:02, 38.6MB/s]Downloading model.safetensors:  70%|███████   | 189M/268M [00:04<00:02, 37.0MB/s]Downloading model.safetensors:  74%|███████▍  | 199M/268M [00:05<00:01, 38.7MB/s]Downloading model.safetensors:  78%|███████▊  | 210M/268M [00:05<00:01, 37.1MB/s]Downloading model.safetensors:  82%|████████▏ | 220M/268M [00:05<00:01, 38.9MB/s]Downloading model.safetensors:  86%|████████▌ | 231M/268M [00:06<00:00, 38.6MB/s]Downloading model.safetensors:  90%|█████████ | 241M/268M [00:06<00:00, 38.5MB/s]Downloading model.safetensors:  94%|█████████▍| 252M/268M [00:06<00:00, 38.4MB/s]Downloading model.safetensors:  98%|█████████▊| 262M/268M [00:06<00:00, 38.3MB/s]Downloading model.safetensors: 100%|██████████| 268M/268M [00:06<00:00, 37.9MB/s]Downloading model.safetensors: 100%|██████████| 268M/268M [00:06<00:00, 38.3MB/s]
+mlapi_api  | Downloading tokenizer_config.json:   0%|          | 0.00/48.0 [00:00<?, ?B/s]Downloading tokenizer_config.json: 100%|██████████| 48.0/48.0 [00:00<00:00, 768kB/s]
+mlapi_api  | Downloading vocab.txt:   0%|          | 0.00/232k [00:00<?, ?B/s]Downloading vocab.txt: 100%|██████████| 232k/232k [00:00<00:00, 8.04MB/s]
+mlapi_api  | INFO:models.sentiment:Model v1 loaded successfully
+mlapi_api  | INFO:models.sentiment:Creating new model instance for version: v2
+mlapi_api  | INFO:models.sentiment:Loading sentiment analysis model (version: v2)...
+mlapi_api  | INFO:models.sentiment:Model v2 loaded successfully
+mlapi_api  | INFO:api.main:Model v1 loaded: True
+mlapi_api  | INFO:api.main:Model v2 loaded: True
+mlapi_api  | INFO:db.database:Database tables initialized successfully
+mlapi_api  | INFO:api.main:Database initialized
+mlapi_api  | INFO:     Application startup complete.
+mlapi_api  | INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+mlapi_api  | INFO:     172.19.0.2:43456 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:cache.redis_client:Redis client initialized: redis://redis:6379/0
+mlapi_api  | /home/apiuser/.local/lib/python3.11/site-packages/pydantic/_internal/_fields.py:149: UserWarning: Field "model_loaded" has conflict with protected namespace "model_".
+mlapi_api  | 
+mlapi_api  | You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+mlapi_api  |   warnings.warn(
+mlapi_api  | /home/apiuser/.local/lib/python3.11/site-packages/pydantic/_internal/_fields.py:149: UserWarning: Field "model_version" has conflict with protected namespace "model_".
+mlapi_api  | 
+mlapi_api  | You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+mlapi_api  |   warnings.warn(
+mlapi_api  | /home/apiuser/.local/lib/python3.11/site-packages/pydantic/_internal/_fields.py:149: UserWarning: Field "model_v1" has conflict with protected namespace "model_".
+mlapi_api  | 
+mlapi_api  | You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+mlapi_api  |   warnings.warn(
+mlapi_api  | /home/apiuser/.local/lib/python3.11/site-packages/pydantic/_internal/_fields.py:149: UserWarning: Field "model_v2" has conflict with protected namespace "model_".
+mlapi_api  | 
+mlapi_api  | You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+mlapi_api  |   warnings.warn(
+mlapi_api  | INFO:     Started server process [1]
+mlapi_api  | INFO:     Waiting for application startup.
+mlapi_api  | INFO:api.main:Starting Production ML API...
+mlapi_api  | INFO:api.main:Preloading models...
+mlapi_api  | INFO:models.sentiment:Creating new model instance for version: v1
+mlapi_api  | INFO:models.sentiment:Loading sentiment analysis model (version: v1)...
+mlapi_api  | INFO:models.sentiment:Model v1 loaded successfully
+mlapi_api  | INFO:models.sentiment:Creating new model instance for version: v2
+mlapi_api  | INFO:models.sentiment:Loading sentiment analysis model (version: v2)...
+mlapi_api  | INFO:models.sentiment:Model v2 loaded successfully
+mlapi_api  | INFO:api.main:Model v1 loaded: True
+mlapi_api  | INFO:api.main:Model v2 loaded: True
+mlapi_api  | INFO:db.database:Database tables initialized successfully
+mlapi_api  | INFO:api.main:Database initialized
+mlapi_api  | INFO:     Application startup complete.
+mlapi_api  | INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+mlapi_api  | INFO:cache.redis_client:Redis client initialized: redis://redis:6379/0
+mlapi_api  | /home/apiuser/.local/lib/python3.11/site-packages/pydantic/_internal/_fields.py:149: UserWarning: Field "model_loaded" has conflict with protected namespace "model_".
+mlapi_api  | 
+mlapi_api  | You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+mlapi_api  |   warnings.warn(
+mlapi_api  | /home/apiuser/.local/lib/python3.11/site-packages/pydantic/_internal/_fields.py:149: UserWarning: Field "model_version" has conflict with protected namespace "model_".
+mlapi_api  | 
+mlapi_api  | You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+mlapi_api  |   warnings.warn(
+mlapi_api  | /home/apiuser/.local/lib/python3.11/site-packages/pydantic/_internal/_fields.py:149: UserWarning: Field "model_v1" has conflict with protected namespace "model_".
+mlapi_api  | 
+mlapi_api  | You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+mlapi_api  |   warnings.warn(
+mlapi_api  | /home/apiuser/.local/lib/python3.11/site-packages/pydantic/_internal/_fields.py:149: UserWarning: Field "model_v2" has conflict with protected namespace "model_".
+mlapi_api  | 
+mlapi_api  | You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+mlapi_api  |   warnings.warn(
+mlapi_api  | INFO:     Started server process [1]
+mlapi_api  | INFO:     Waiting for application startup.
+mlapi_api  | INFO:api.main:Starting Production ML API...
+mlapi_api  | INFO:api.main:Preloading models...
+mlapi_api  | INFO:models.sentiment:Creating new model instance for version: v1
+mlapi_api  | INFO:models.sentiment:Loading sentiment analysis model (version: v1)...
+mlapi_api  | INFO:models.sentiment:Model v1 loaded successfully
+mlapi_api  | INFO:models.sentiment:Creating new model instance for version: v2
+mlapi_api  | INFO:models.sentiment:Loading sentiment analysis model (version: v2)...
+mlapi_api  | INFO:models.sentiment:Model v2 loaded successfully
+mlapi_api  | INFO:api.main:Model v1 loaded: True
+mlapi_api  | INFO:api.main:Model v2 loaded: True
+mlapi_api  | INFO:db.database:Database tables initialized successfully
+mlapi_api  | INFO:api.main:Database initialized
+mlapi_api  | INFO:     Application startup complete.
+mlapi_api  | INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+mlapi_api  | INFO:cache.redis_client:Redis client initialized: redis://redis:6379/0
+mlapi_api  | INFO:     127.0.0.1:47530 - "GET /health HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:40246 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:44260 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     127.0.0.1:58996 - "GET /health HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:43922 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:46972 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     127.0.0.1:46078 - "GET /health HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:41568 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:54812 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     127.0.0.1:50554 - "GET /health HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:52590 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:50252 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     127.0.0.1:45118 - "GET /health HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:47224 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:56300 - "GET / HTTP/1.1" 200 OK
+[Kmlapi_api exited with code 139 (restarting)
+mlapi_api  | /home/apiuser/.local/lib/python3.11/site-packages/pydantic/_internal/_fields.py:149: UserWarning: Field "model_loaded" has conflict with protected namespace "model_".
+mlapi_api  | 
+mlapi_api  | You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+mlapi_api  |   warnings.warn(
+mlapi_api  | /home/apiuser/.local/lib/python3.11/site-packages/pydantic/_internal/_fields.py:149: UserWarning: Field "model_version" has conflict with protected namespace "model_".
+mlapi_api  | 
+mlapi_api  | You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+mlapi_api  |   warnings.warn(
+mlapi_api  | /home/apiuser/.local/lib/python3.11/site-packages/pydantic/_internal/_fields.py:149: UserWarning: Field "model_v1" has conflict with protected namespace "model_".
+mlapi_api  | 
+mlapi_api  | You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+mlapi_api  |   warnings.warn(
+mlapi_api  | /home/apiuser/.local/lib/python3.11/site-packages/pydantic/_internal/_fields.py:149: UserWarning: Field "model_v2" has conflict with protected namespace "model_".
+mlapi_api  | 
+mlapi_api  | You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+mlapi_api  |   warnings.warn(
+mlapi_api  | INFO:     Started server process [1]
+mlapi_api  | INFO:     Waiting for application startup.
+mlapi_api  | INFO:api.main:Starting Production ML API...
+mlapi_api  | INFO:api.main:Preloading models...
+mlapi_api  | INFO:models.sentiment:Creating new model instance for version: v1
+mlapi_api  | INFO:models.sentiment:Loading sentiment analysis model (version: v1)...
+mlapi_api  | INFO:models.sentiment:Model v1 loaded successfully
+mlapi_api  | INFO:models.sentiment:Creating new model instance for version: v2
+mlapi_api  | INFO:models.sentiment:Loading sentiment analysis model (version: v2)...
+mlapi_api  | INFO:models.sentiment:Model v2 loaded successfully
+mlapi_api  | INFO:api.main:Model v1 loaded: True
+mlapi_api  | INFO:api.main:Model v2 loaded: True
+mlapi_api  | INFO:db.database:Database tables initialized successfully
+mlapi_api  | INFO:api.main:Database initialized
+mlapi_api  | INFO:     Application startup complete.
+mlapi_api  | INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+mlapi_api  | INFO:cache.redis_client:Redis client initialized: redis://redis:6379/0
+mlapi_api  | INFO:     127.0.0.1:60268 - "GET /health HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:50712 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:38768 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     127.0.0.1:35324 - "GET /health HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:34962 - "GET / HTTP/1.1" 200 OK
+[Kmlapi_api exited with code 139 (restarting)
+mlapi_api  | /home/apiuser/.local/lib/python3.11/site-packages/pydantic/_internal/_fields.py:149: UserWarning: Field "model_loaded" has conflict with protected namespace "model_".
+mlapi_api  | 
+mlapi_api  | You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+mlapi_api  |   warnings.warn(
+mlapi_api  | /home/apiuser/.local/lib/python3.11/site-packages/pydantic/_internal/_fields.py:149: UserWarning: Field "model_version" has conflict with protected namespace "model_".
+mlapi_api  | 
+mlapi_api  | You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+mlapi_api  |   warnings.warn(
+mlapi_api  | /home/apiuser/.local/lib/python3.11/site-packages/pydantic/_internal/_fields.py:149: UserWarning: Field "model_v1" has conflict with protected namespace "model_".
+mlapi_api  | 
+mlapi_api  | You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+mlapi_api  |   warnings.warn(
+mlapi_api  | /home/apiuser/.local/lib/python3.11/site-packages/pydantic/_internal/_fields.py:149: UserWarning: Field "model_v2" has conflict with protected namespace "model_".
+mlapi_api  | 
+mlapi_api  | You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+mlapi_api  |   warnings.warn(
+mlapi_api  | INFO:     Started server process [1]
+mlapi_api  | INFO:     Waiting for application startup.
+mlapi_api  | INFO:api.main:Starting Production ML API...
+mlapi_api  | INFO:api.main:Preloading models...
+mlapi_api  | INFO:models.sentiment:Creating new model instance for version: v1
+mlapi_api  | INFO:models.sentiment:Loading sentiment analysis model (version: v1)...
+mlapi_api  | INFO:models.sentiment:Model v1 loaded successfully
+mlapi_api  | INFO:models.sentiment:Creating new model instance for version: v2
+mlapi_api  | INFO:models.sentiment:Loading sentiment analysis model (version: v2)...
+mlapi_api  | INFO:models.sentiment:Model v2 loaded successfully
+mlapi_api  | INFO:api.main:Model v1 loaded: True
+mlapi_api  | INFO:api.main:Model v2 loaded: True
+mlapi_api  | INFO:db.database:Database tables initialized successfully
+mlapi_api  | INFO:api.main:Database initialized
+mlapi_api  | INFO:     Application startup complete.
+mlapi_api  | INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+mlapi_api  | INFO:cache.redis_client:Redis client initialized: redis://redis:6379/0
+mlapi_api  | INFO:     127.0.0.1:37346 - "GET /health HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:54226 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:58224 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     127.0.0.1:35384 - "GET /health HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:53822 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:56634 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     127.0.0.1:45420 - "GET /health HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:47294 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:43922 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     127.0.0.1:36034 - "GET /health HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:41140 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:50264 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     127.0.0.1:58308 - "GET /health HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:42990 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:40732 - "GET / HTTP/1.1" 200 OK
+[Kmlapi_api has been recreated
+mlapi_api  | INFO:     Shutting down
+mlapi_api  | INFO:     Waiting for application shutdown.
+mlapi_api  | INFO:api.main:Shutting down Production ML API...
+mlapi_api  | INFO:db.database:Database connections closed
+mlapi_api  | INFO:     Application shutdown complete.
+mlapi_api  | INFO:     Finished server process [1]
+[Kmlapi_api exited with code 0
+mlapi_api  | /home/apiuser/.local/lib/python3.11/site-packages/pydantic/_internal/_fields.py:149: UserWarning: Field "model_loaded" has conflict with protected namespace "model_".
+mlapi_api  | 
+mlapi_api  | You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+mlapi_api  |   warnings.warn(
+mlapi_api  | /home/apiuser/.local/lib/python3.11/site-packages/pydantic/_internal/_fields.py:149: UserWarning: Field "model_version" has conflict with protected namespace "model_".
+mlapi_api  | 
+mlapi_api  | You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+mlapi_api  |   warnings.warn(
+mlapi_api  | /home/apiuser/.local/lib/python3.11/site-packages/pydantic/_internal/_fields.py:149: UserWarning: Field "model_v1" has conflict with protected namespace "model_".
+mlapi_api  | 
+mlapi_api  | You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+mlapi_api  |   warnings.warn(
+mlapi_api  | /home/apiuser/.local/lib/python3.11/site-packages/pydantic/_internal/_fields.py:149: UserWarning: Field "model_v2" has conflict with protected namespace "model_".
+mlapi_api  | 
+mlapi_api  | You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+mlapi_api  |   warnings.warn(
+mlapi_api  | INFO:     Started server process [1]
+mlapi_api  | INFO:     Waiting for application startup.
+mlapi_api  | INFO:api.main:Starting Production ML API...
+mlapi_api  | INFO:api.main:Preloading models...
+mlapi_api  | INFO:models.sentiment:Creating new model instance for version: v1
+mlapi_api  | INFO:models.sentiment:Loading sentiment analysis model (version: v1)...
+mlapi_api  | Downloading config.json:   0%|          | 0.00/629 [00:00<?, ?B/s]Downloading config.json: 100%|██████████| 629/629 [00:00<00:00, 6.60MB/s]
+mlapi_api  | Downloading model.safetensors:   0%|          | 0.00/268M [00:00<?, ?B/s]Downloading model.safetensors:   4%|▍         | 10.5M/268M [00:00<00:08, 30.8MB/s]Downloading model.safetensors:   8%|▊         | 21.0M/268M [00:00<00:06, 36.6MB/s]Downloading model.safetensors:  12%|█▏        | 31.5M/268M [00:00<00:05, 39.8MB/s]Downloading model.safetensors:  16%|█▌        | 41.9M/268M [00:01<00:05, 38.7MB/s]Downloading model.safetensors:  20%|█▉        | 52.4M/268M [00:01<00:05, 38.8MB/s]Downloading model.safetensors:  23%|██▎       | 62.9M/268M [00:01<00:05, 38.7MB/s]Downloading model.safetensors:  27%|██▋       | 73.4M/268M [00:01<00:05, 38.6MB/s]Downloading model.safetensors:  31%|███▏      | 83.9M/268M [00:02<00:04, 38.4MB/s]Downloading model.safetensors:  35%|███▌      | 94.4M/268M [00:02<00:04, 37.4MB/s]Downloading model.safetensors:  39%|███▉      | 105M/268M [00:02<00:04, 37.8MB/s] Downloading model.safetensors:  43%|████▎     | 115M/268M [00:03<00:03, 38.6MB/s]Downloading model.safetensors:  47%|████▋     | 126M/268M [00:03<00:03, 38.5MB/s]Downloading model.safetensors:  51%|█████     | 136M/268M [00:03<00:03, 38.3MB/s]Downloading model.safetensors:  55%|█████▍    | 147M/268M [00:03<00:03, 38.4MB/s]Downloading model.safetensors:  59%|█████▊    | 157M/268M [00:04<00:02, 38.1MB/s]Downloading model.safetensors:  63%|██████▎   | 168M/268M [00:04<00:02, 38.3MB/s]Downloading model.safetensors:  67%|██████▋   | 178M/268M [00:04<00:02, 37.9MB/s]Downloading model.safetensors:  70%|███████   | 189M/268M [00:04<00:02, 38.3MB/s]Downloading model.safetensors:  74%|███████▍  | 199M/268M [00:05<00:01, 38.3MB/s]Downloading model.safetensors:  78%|███████▊  | 210M/268M [00:05<00:01, 38.2MB/s]Downloading model.safetensors:  82%|████████▏ | 220M/268M [00:05<00:01, 37.4MB/s]Downloading model.safetensors:  86%|████████▌ | 231M/268M [00:06<00:00, 38.4MB/s]Downloading model.safetensors:  90%|█████████ | 241M/268M [00:06<00:00, 38.4MB/s]Downloading model.safetensors:  94%|█████████▍| 252M/268M [00:06<00:00, 34.5MB/s]Downloading model.safetensors:  98%|█████████▊| 262M/268M [00:06<00:00, 38.4MB/s]Downloading model.safetensors: 100%|██████████| 268M/268M [00:07<00:00, 39.2MB/s]Downloading model.safetensors: 100%|██████████| 268M/268M [00:07<00:00, 38.1MB/s]
+mlapi_api  | Downloading tokenizer_config.json:   0%|          | 0.00/48.0 [00:00<?, ?B/s]Downloading tokenizer_config.json: 100%|██████████| 48.0/48.0 [00:00<00:00, 515kB/s]
+mlapi_api  | Downloading vocab.txt:   0%|          | 0.00/232k [00:00<?, ?B/s]Downloading vocab.txt: 100%|██████████| 232k/232k [00:00<00:00, 7.34MB/s]
+mlapi_api  | INFO:models.sentiment:Model v1 loaded successfully
+mlapi_api  | INFO:models.sentiment:Creating new model instance for version: v2
+mlapi_api  | INFO:models.sentiment:Loading sentiment analysis model (version: v2)...
+mlapi_api  | INFO:models.sentiment:Model v2 loaded successfully
+mlapi_api  | INFO:api.main:Model v1 loaded: True
+mlapi_api  | INFO:api.main:Model v2 loaded: True
+mlapi_api  | INFO:db.database:Database tables initialized successfully
+mlapi_api  | INFO:api.main:Database initialized
+mlapi_api  | INFO:     Application startup complete.
+mlapi_api  | INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+mlapi_api  | INFO:     172.19.0.2:36164 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:42340 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:38172 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:cache.redis_client:Redis client initialized: redis://redis:6379/0
+[Kmlapi_api exited with code 139 (restarting)
+mlapi_api  | /home/apiuser/.local/lib/python3.11/site-packages/pydantic/_internal/_fields.py:149: UserWarning: Field "model_loaded" has conflict with protected namespace "model_".
+mlapi_api  | 
+mlapi_api  | You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+mlapi_api  |   warnings.warn(
+mlapi_api  | /home/apiuser/.local/lib/python3.11/site-packages/pydantic/_internal/_fields.py:149: UserWarning: Field "model_version" has conflict with protected namespace "model_".
+mlapi_api  | 
+mlapi_api  | You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+mlapi_api  |   warnings.warn(
+mlapi_api  | /home/apiuser/.local/lib/python3.11/site-packages/pydantic/_internal/_fields.py:149: UserWarning: Field "model_v1" has conflict with protected namespace "model_".
+mlapi_api  | 
+mlapi_api  | You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+mlapi_api  |   warnings.warn(
+mlapi_api  | /home/apiuser/.local/lib/python3.11/site-packages/pydantic/_internal/_fields.py:149: UserWarning: Field "model_v2" has conflict with protected namespace "model_".
+mlapi_api  | 
+mlapi_api  | You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+mlapi_api  |   warnings.warn(
+mlapi_api  | INFO:     Started server process [1]
+mlapi_api  | INFO:     Waiting for application startup.
+mlapi_api  | INFO:api.main:Starting Production ML API...
+mlapi_api  | INFO:api.main:Preloading models...
+mlapi_api  | INFO:models.sentiment:Creating new model instance for version: v1
+mlapi_api  | INFO:models.sentiment:Loading sentiment analysis model (version: v1)...
+mlapi_api  | INFO:models.sentiment:Model v1 loaded successfully
+mlapi_api  | INFO:models.sentiment:Creating new model instance for version: v2
+mlapi_api  | INFO:models.sentiment:Loading sentiment analysis model (version: v2)...
+mlapi_api  | INFO:models.sentiment:Model v2 loaded successfully
+mlapi_api  | INFO:api.main:Model v1 loaded: True
+mlapi_api  | INFO:api.main:Model v2 loaded: True
+mlapi_api  | INFO:db.database:Database tables initialized successfully
+mlapi_api  | INFO:api.main:Database initialized
+mlapi_api  | INFO:     Application startup complete.
+mlapi_api  | INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+mlapi_api  | INFO:     172.19.0.2:38740 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:46966 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:59498 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:48972 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:39468 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:53374 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:53518 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:54312 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:57074 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:39306 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:58830 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:40532 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:49144 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     172.19.0.2:47660 - "GET / HTTP/1.1" 200 OK
+mlapi_api  | INFO:     Shutting down
+mlapi_api  | INFO:     Waiting for application shutdown.
+mlapi_api  | INFO:api.main:Shutting down Production ML API...
+mlapi_api  | INFO:db.database:Database connections closed
+mlapi_api  | INFO:     Application shutdown complete.
+mlapi_api  | INFO:     Finished server process [1]
+[Kmlapi_api exited with code 0
