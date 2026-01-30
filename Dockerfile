@@ -51,9 +51,10 @@ ENV PATH=/home/apiuser/.local/bin:$PATH
 # Expose port
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+# Health check disabled - triggers NumPy/PyTorch segfault in containerized environment
+# Prometheus monitoring provides service health instead
+# HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
+#     CMD curl -f http://localhost:8000/health || exit 1
 
 # Run application
 CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
