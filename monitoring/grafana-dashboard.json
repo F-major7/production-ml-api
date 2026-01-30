@@ -1,0 +1,153 @@
+{
+  "dashboard": {
+    "title": "Production ML API - Observability Dashboard",
+    "uid": "mlapi-dashboard",
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "refresh": "5s",
+    "time": {
+      "from": "now-15m",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "type": "graph",
+        "title": "API Request Rate (req/sec)",
+        "targets": [
+          {
+            "expr": "rate(api_requests_total[1m])",
+            "legendFormat": "{{endpoint}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "reqps", "label": "Requests/sec"},
+          {"format": "short"}
+        ],
+        "xaxis": {"mode": "time"},
+        "legend": {"show": true}
+      },
+      {
+        "id": 2,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "type": "graph",
+        "title": "Request Latency (p50, p95, p99)",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(api_request_latency_seconds_bucket[5m])) * 1000",
+            "legendFormat": "p50",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(api_request_latency_seconds_bucket[5m])) * 1000",
+            "legendFormat": "p95",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(api_request_latency_seconds_bucket[5m])) * 1000",
+            "legendFormat": "p99",
+            "refId": "C"
+          }
+        ],
+        "yaxes": [
+          {"format": "ms", "label": "Milliseconds"},
+          {"format": "short"}
+        ],
+        "xaxis": {"mode": "time"},
+        "legend": {"show": true}
+      },
+      {
+        "id": 3,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "type": "graph",
+        "title": "Error Rate (4xx/5xx)",
+        "targets": [
+          {
+            "expr": "rate(api_requests_total{status_code=~\"4..|5..\"}[5m])",
+            "legendFormat": "{{status_code}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "reqps", "label": "Errors/sec"},
+          {"format": "short"}
+        ],
+        "xaxis": {"mode": "time"},
+        "thresholds": [
+          {"value": 0.1, "colorMode": "custom", "fill": true, "line": true, "op": "gt", "fillColor": "rgba(255, 255, 0, 0.2)"},
+          {"value": 1.0, "colorMode": "custom", "fill": true, "line": true, "op": "gt", "fillColor": "rgba(255, 0, 0, 0.2)"}
+        ]
+      },
+      {
+        "id": 4,
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 8},
+        "type": "gauge",
+        "title": "Cache Hit Rate (%)",
+        "targets": [
+          {
+            "expr": "cache_hit_rate",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "orientation": "auto",
+          "showThresholdLabels": false,
+          "showThresholdMarkers": true
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 30, "color": "yellow"},
+                {"value": 70, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 8},
+        "type": "piechart",
+        "title": "Predictions by Sentiment",
+        "targets": [
+          {
+            "expr": "predictions_by_sentiment",
+            "legendFormat": "{{sentiment}}",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "legend": {"displayMode": "list", "placement": "bottom"}
+        }
+      },
+      {
+        "id": 6,
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+        "type": "graph",
+        "title": "A/B Test Traffic Split (Model Versions)",
+        "targets": [
+          {
+            "expr": "rate(api_requests_total{endpoint=~\"/predict/ab.*\"}[5m])",
+            "legendFormat": "{{endpoint}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "reqps", "label": "Requests/sec"},
+          {"format": "short"}
+        ],
+        "xaxis": {"mode": "time"},
+        "legend": {"show": true, "alignAsTable": true, "rightSide": true}
+      }
+    ]
+  }
+}
+

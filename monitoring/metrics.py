@@ -46,7 +46,7 @@ predictions_by_sentiment = Counter(
 )
 
 
-def track_request(endpoint: str, status_code: int, latency: float) -> None:
+def track_request(endpoint: str, status_code: int, latency: float, model_version: str = None) -> None:
     """
     Track API request metrics.
     
@@ -54,10 +54,23 @@ def track_request(endpoint: str, status_code: int, latency: float) -> None:
         endpoint: API endpoint path
         status_code: HTTP status code
         latency: Request latency in seconds
+        model_version: Optional model version for A/B testing
     """
     try:
-        api_requests_total.labels(endpoint=endpoint, status_code=status_code).inc()
-        api_request_latency_seconds.labels(endpoint=endpoint).observe(latency)
+        # Track requests with model version if provided
+        if model_version:
+            # For A/B endpoints, include model version in labels
+            api_requests_total.labels(
+                endpoint=f"{endpoint}_{model_version}", 
+                status_code=status_code
+            ).inc()
+            api_request_latency_seconds.labels(
+                endpoint=f"{endpoint}_{model_version}"
+            ).observe(latency)
+        else:
+            # Standard tracking without model version
+            api_requests_total.labels(endpoint=endpoint, status_code=status_code).inc()
+            api_request_latency_seconds.labels(endpoint=endpoint).observe(latency)
     except Exception as e:
         logger.error(f"Error tracking request metrics: {e}")
 
@@ -80,15 +93,23 @@ def track_cache_miss() -> None:
         logger.error(f"Error tracking cache miss: {e}")
 
 
-def track_prediction(sentiment: str) -> None:
+def track_prediction(sentiment: str, model_version: str = None) -> None:
     """
     Track prediction by sentiment type.
     
     Args:
         sentiment: Sentiment label (positive/negative/neutral)
+        model_version: Optional model version for A/B testing
     """
     try:
-        predictions_by_sentiment.labels(sentiment=sentiment).inc()
+        if model_version:
+            # Track with model version label for A/B testing
+            predictions_by_sentiment.labels(
+                sentiment=f"{sentiment}_{model_version}"
+            ).inc()
+        else:
+            # Standard tracking
+            predictions_by_sentiment.labels(sentiment=sentiment).inc()
     except Exception as e:
         logger.error(f"Error tracking prediction: {e}")
 

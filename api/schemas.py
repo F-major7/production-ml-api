@@ -250,3 +250,66 @@ class CacheStatsResponse(BaseModel):
             }
         }
 
+
+class ABPredictResponse(PredictResponse):
+    """Response schema for A/B test predictions"""
+    model_version: str = Field(..., description="Model version used (v1/v2)")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "sentiment": "positive",
+                "confidence": 0.9998,
+                "latency_ms": 45.23,
+                "cache_hit": False,
+                "model_version": "v1"
+            }
+        }
+
+
+class ModelStats(BaseModel):
+    """Statistics for a single model version"""
+    total_predictions: int = Field(..., description="Total predictions made")
+    avg_confidence: float = Field(..., description="Average confidence score")
+    avg_latency_ms: float = Field(..., description="Average latency in milliseconds")
+    sentiment_distribution: dict = Field(..., description="Count by sentiment type")
+
+
+class ComparisonStats(BaseModel):
+    """Comparison metrics between model versions"""
+    confidence_diff: float = Field(..., description="Confidence difference (v2 - v1)")
+    latency_diff: float = Field(..., description="Latency difference (v2 - v1)")
+    sample_size_sufficient: bool = Field(..., description="Both versions have >100 predictions")
+    traffic_distribution: dict = Field(..., description="Traffic percentage per version")
+
+
+class ABComparisonResponse(BaseModel):
+    """Response schema for A/B test comparison"""
+    model_v1: ModelStats = Field(..., description="Statistics for model v1")
+    model_v2: ModelStats = Field(..., description="Statistics for model v2")
+    comparison: ComparisonStats = Field(..., description="Comparison metrics")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "model_v1": {
+                    "total_predictions": 523,
+                    "avg_confidence": 0.9456,
+                    "avg_latency_ms": 48.32,
+                    "sentiment_distribution": {"positive": 312, "negative": 211, "neutral": 0}
+                },
+                "model_v2": {
+                    "total_predictions": 507,
+                    "avg_confidence": 0.9445,
+                    "avg_latency_ms": 47.89,
+                    "sentiment_distribution": {"positive": 298, "negative": 209, "neutral": 0}
+                },
+                "comparison": {
+                    "confidence_diff": -0.0011,
+                    "latency_diff": -0.43,
+                    "sample_size_sufficient": True,
+                    "traffic_distribution": {"v1": 50.8, "v2": 49.2}
+                }
+            }
+        }
+

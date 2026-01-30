@@ -1,0 +1,15 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'mlapi'
+    environment: 'development'
+
+scrape_configs:
+  - job_name: 'mlapi'
+    static_configs:
+      - targets: ['host.docker.internal:8000']
+    metrics_path: '/metrics/'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+
