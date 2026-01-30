@@ -13,6 +13,7 @@ from slowapi.errors import RateLimitExceeded
 import time
 import logging
 import json
+import os
 from typing import Optional
 
 from api.schemas import (
@@ -50,8 +51,11 @@ from sqlalchemy import func, select
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize rate limiter
-limiter = Limiter(key_func=get_remote_address)
+# Check if running in test mode (disables rate limiting)
+TESTING = os.getenv("TESTING", "0") == "1"
+
+# Initialize rate limiter (disabled during tests)
+limiter = Limiter(key_func=get_remote_address, enabled=not TESTING)
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -64,7 +68,8 @@ app = FastAPI(
 
 # Add rate limiter to app state
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+if not TESTING:
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Enable CORS for development
 app.add_middleware(

@@ -3,9 +3,41 @@ SQLAlchemy ORM models for database tables
 """
 import uuid
 from datetime import datetime
-from sqlalchemy import String, Float, Boolean, DateTime, Text, Index
+from sqlalchemy import String, Float, Boolean, DateTime, Text, Index, TypeDecorator, CHAR
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+
+
+class GUID(TypeDecorator):
+    """Platform-independent GUID type.
+    Uses PostgreSQL's UUID type when available, otherwise stores as CHAR(36).
+    """
+    impl = CHAR
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == 'postgresql':
+            return dialect.type_descriptor(PG_UUID(as_uuid=True))
+        else:
+            return dialect.type_descriptor(CHAR(36))
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
+        elif dialect.name == 'postgresql':
+            return value
+        else:
+            if isinstance(value, uuid.UUID):
+                return str(value)
+            else:
+                return str(uuid.UUID(value))
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return value
+        if isinstance(value, uuid.UUID):
+            return value
+        return uuid.UUID(value)
 
 
 class Base(DeclarativeBase):
@@ -20,9 +52,9 @@ class Prediction(Base):
     """
     __tablename__ = "predictions"
     
-    # Primary key
+    # Primary key (uses GUID for cross-database compatibility)
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        GUID(),
         primary_key=True,
         default=uuid.uuid4,
         index=True
