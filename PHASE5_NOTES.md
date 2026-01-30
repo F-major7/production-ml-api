@@ -87,7 +87,7 @@ INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
 [container exits with code 139 on first POST request - no error logged]
 ```
 
-### 🔄 Rate Limiting: Deferred to Phase 7
+### ✅ Rate Limiting: COMPLETE
 
 **Why Removed:**
 - `slowapi` was initially suspected as crash cause
