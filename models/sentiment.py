@@ -2,7 +2,7 @@
 Sentiment Analysis Model Wrapper
 Supports multiple model versions for A/B testing
 
-NOTE: Docker-compatible version with single-threaded PyTorch.
+NOTE: Docker-compatible version with multi-threaded PyTorch (testing).
 """
 from typing import Dict, Optional
 from transformers import pipeline
@@ -14,32 +14,28 @@ import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
-# CRITICAL: Set PyTorch to single-threaded BEFORE any torch operations
-# This must happen before pipeline/model loading
-torch.set_num_threads(1)
-torch.set_num_interop_threads(1)
+# Set PyTorch threading - trying 4 threads for better performance
+# If this causes segfaults, revert to 1
+torch.set_num_threads(4)
+torch.set_num_interop_threads(2)
 
-# Disable all backends that might cause Docker issues
+# Disable CUDA backends (not needed for CPU-only)
 if hasattr(torch.backends, 'cudnn'):
     torch.backends.cudnn.enabled = False
-if hasattr(torch.backends, 'mkl'):
-    torch.backends.mkl.is_available = lambda: False
-if hasattr(torch.backends, 'mkldnn'):
-    torch.backends.mkldnn.is_available = lambda: False
 
-# Also set via environment (backup for subprocess/forks)
-os.environ['OMP_NUM_THREADS'] = '1'
-os.environ['MKL_NUM_THREADS'] = '1'
-os.environ['OPENBLAS_NUM_THREADS'] = '1'
-os.environ['VECLIB_MAXIMUM_THREADS'] = '1'
-os.environ['NUMEXPR_NUM_THREADS'] = '1'
+# Set environment variables for threading
+os.environ['OMP_NUM_THREADS'] = '4'
+os.environ['MKL_NUM_THREADS'] = '4'
+os.environ['OPENBLAS_NUM_THREADS'] = '4'
+os.environ['VECLIB_MAXIMUM_THREADS'] = '4'
+os.environ['NUMEXPR_NUM_THREADS'] = '4'
 os.environ['CUDA_VISIBLE_DEVICES'] = ''  # Hide all CUDA devices
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Thread pool for running inference (single worker only)
-_inference_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="torch_infer")
+# Thread pool for running inference (2 workers for better throughput)
+_inference_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="torch_infer")
 
 # Lock to ensure only one inference at a time (prevent concurrent model access)
 _inference_lock = threading.Lock()

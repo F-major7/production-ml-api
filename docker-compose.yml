@@ -10,11 +10,11 @@ services:
       DATABASE_URL: postgresql+asyncpg://mlapi_user:mlapi_password@postgres:5432/mlapi
       REDIS_URL: redis://redis:6379/0
       LOG_LEVEL: INFO
-      # PyTorch/NumPy threading fixes for Docker stability
-      OMP_NUM_THREADS: "1"
-      MKL_NUM_THREADS: "1"
-      NUMEXPR_NUM_THREADS: "1"
-      OPENBLAS_NUM_THREADS: "1"
+      # PyTorch threading - testing with 4 threads for better performance
+      OMP_NUM_THREADS: "4"
+      MKL_NUM_THREADS: "4"
+      NUMEXPR_NUM_THREADS: "4"
+      OPENBLAS_NUM_THREADS: "4"
       # HuggingFace tokenizer parallelism fix
       TOKENIZERS_PARALLELISM: "false"
       # Disable uvloop - incompatible with PyTorch in Docker
