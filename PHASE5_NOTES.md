@@ -48,6 +48,11 @@ This is a known issue with ML models in production containers.
 4. ❌ Pinned `numpy<2.0` - still crashes
 5. ❌ Added threading limits (OMP_NUM_THREADS=1, etc.) - still crashes
 6. ❌ Added memory limits (2G) - still crashes
+7. ❌ Added `shm_size: 8gb` to docker-compose.yml - still crashes
+8. ❌ Set `TOKENIZERS_PARALLELISM=false` - still crashes
+9. ❌ Wrapped predictions in `torch.no_grad()` - still crashes
+10. ❌ Added explicit `gc.collect()` after inference - still crashes
+11. ❌ Forced CPU mode with `device=-1` in pipeline - still crashes
 
 **Evidence:**
 ```bash
@@ -183,6 +188,9 @@ fix: Disable Docker health checks to prevent crashes
 
 # Commit 7: Removed slowapi
 fix: Remove slowapi rate limiting to resolve Docker crashes
+
+# Commit 8: Added PyTorch Docker fixes
+fix: Apply PyTorch Docker fixes (shm_size, tokenizers, torch.no_grad, CPU mode)
 ```
 
 ---
