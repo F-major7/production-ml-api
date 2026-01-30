@@ -10,8 +10,19 @@ services:
       DATABASE_URL: postgresql+asyncpg://mlapi_user:mlapi_password@postgres:5432/mlapi
       REDIS_URL: redis://redis:6379/0
       LOG_LEVEL: INFO
+      # PyTorch/NumPy threading fixes for Docker stability
+      OMP_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      NUMEXPR_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
     ports:
       - "8000:8000"
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
     depends_on:
       postgres:
         condition: service_healthy
