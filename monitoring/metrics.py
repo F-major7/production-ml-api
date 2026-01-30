@@ -45,6 +45,13 @@ predictions_by_sentiment = Counter(
     ['sentiment']
 )
 
+# Rate Limiting Metrics
+rate_limit_exceeded_total = Counter(
+    'rate_limit_exceeded_total',
+    'Total rate limit exceeded (429) responses',
+    ['endpoint']
+)
+
 
 def track_request(endpoint: str, status_code: int, latency: float, model_version: str = None) -> None:
     """
@@ -170,4 +177,17 @@ def get_cache_stats() -> dict:
             "misses": 0,
             "hit_rate": 0.0
         }
+
+
+def track_rate_limit_exceeded(endpoint: str) -> None:
+    """
+    Track rate limit exceeded events.
+    
+    Args:
+        endpoint: API endpoint that exceeded rate limit
+    """
+    try:
+        rate_limit_exceeded_total.labels(endpoint=endpoint).inc()
+    except Exception as e:
+        logger.error(f"Error tracking rate limit exceeded: {e}")
 

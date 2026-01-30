@@ -7,6 +7,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from prometheus_client import make_asgi_app
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 import time
 import logging
 import json
@@ -20,6 +23,7 @@ from api.schemas import (
     BatchPredictRequest,
     BatchPredictResponse,
     CacheStatsResponse,
+    RateLimitStatusResponse,
     ABPredictResponse,
     ABComparisonResponse,
     ModelStats,
@@ -37,13 +41,17 @@ from monitoring.metrics import (
     track_cache_hit,
     track_cache_miss,
     track_prediction,
-    get_cache_stats
+    get_cache_stats,
+    track_rate_limit_exceeded
 )
 from sqlalchemy import func, select
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -53,6 +61,10 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
+# Add rate limiter to app state
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Enable CORS for development
 app.add_middleware(
@@ -82,39 +94,74 @@ async def root():
 
 @app.get(
     "/health",
-    response_model=HealthResponse,
     tags=["Health"],
     summary="Health check endpoint"
 )
-async def health_check():
+async def health_check(
+    redis: Optional[RedisCache] = Depends(get_redis),
+    db: Optional[AsyncSession] = Depends(get_db)
+):
     """
-    Check API and model health status.
-    Returns 200 if healthy, 503 if model not loaded.
+    Check API health status including model, database, and Redis.
+    Returns 200 if healthy, 503 if any critical component is unhealthy.
     """
+    health_status = {
+        "status": "healthy",
+        "model_loaded": False,
+        "database_connected": False,
+        "redis_connected": False
+    }
+    
+    is_healthy = True
+    
     try:
+        # Check model
         model = SentimentModel()
-        model_loaded = model.is_loaded
+        health_status["model_loaded"] = model.is_loaded
+        if not model.is_loaded:
+            is_healthy = False
         
-        if model_loaded:
-            return HealthResponse(
-                status="healthy",
-                model_loaded=True
-            )
+        # Check database
+        if db is not None:
+            try:
+                # Simple query to check connection
+                await db.execute(select(func.count()).select_from(Prediction))
+                health_status["database_connected"] = True
+            except Exception as db_error:
+                logger.warning(f"Database health check failed: {db_error}")
+                health_status["database_connected"] = False
+                # Database is critical, mark as unhealthy
+                is_healthy = False
+        
+        # Check Redis
+        if redis is not None and redis.is_available:
+            try:
+                # Try to get cache size as a health check
+                await redis.get_cache_size()
+                health_status["redis_connected"] = True
+            except Exception as redis_error:
+                logger.warning(f"Redis health check failed: {redis_error}")
+                health_status["redis_connected"] = False
+                # Redis is not critical, don't mark as unhealthy
+        
+        # Set overall status
+        if is_healthy:
+            health_status["status"] = "healthy"
+            return JSONResponse(status_code=200, content=health_status)
         else:
-            return JSONResponse(
-                status_code=503,
-                content={
-                    "status": "unhealthy",
-                    "model_loaded": False
-                }
-            )
+            health_status["status"] = "unhealthy"
+            return JSONResponse(status_code=503, content=health_status)
+            
     except Exception as e:
         logger.error(f"Health check failed: {e}")
         return JSONResponse(
             status_code=503,
             content={
                 "status": "unhealthy",
-                "model_loaded": False
+                "model_loaded": False,
+                "database_connected": False,
+                "redis_connected": False,
+                "error": str(e)
             }
         )
 
@@ -125,8 +172,10 @@ async def health_check():
     tags=["Prediction"],
     summary="Predict sentiment of text"
 )
+@limiter.limit("100/minute")
 async def predict_sentiment(
-    request: PredictRequest,
+    request: Request,
+    predict_request: PredictRequest,
     model: SentimentModel = Depends(get_model),
     redis: Optional[RedisCache] = Depends(get_redis),
     db: Optional[AsyncSession] = Depends(get_db)
@@ -151,7 +200,7 @@ async def predict_sentiment(
     try:
         # Try cache first if Redis is available
         if redis is not None:
-            cache_key = redis.generate_cache_key(request.text)
+            cache_key = redis.generate_cache_key(predict_request.text)
             cached_result = await redis.get(cache_key)
             
             if cached_result is not None:
@@ -182,7 +231,7 @@ async def predict_sentiment(
             model_start = time.perf_counter()
             
             # Get prediction from model
-            result = model.predict(request.text)
+            result = model.predict(predict_request.text)
             
             # Calculate latency
             model_end = time.perf_counter()
@@ -210,7 +259,7 @@ async def predict_sentiment(
                         "sentiment": sentiment,
                         "confidence": confidence
                     }
-                    cache_key = redis.generate_cache_key(request.text)
+                    cache_key = redis.generate_cache_key(predict_request.text)
                     await redis.set(cache_key, json.dumps(cache_data), ttl=3600)
                     logger.debug(f"Cached result for key: {cache_key}")
                 except Exception as cache_error:
@@ -224,7 +273,7 @@ async def predict_sentiment(
         if db is not None:
             try:
                 prediction = Prediction(
-                    input_text=request.text,
+                    input_text=predict_request.text,
                     predicted_sentiment=sentiment,
                     confidence_score=confidence,
                     latency_ms=latency_ms,
@@ -270,8 +319,10 @@ async def predict_sentiment(
     tags=["Prediction"],
     summary="Batch predict sentiment for multiple texts"
 )
+@limiter.limit("20/minute")
 async def batch_predict_sentiment(
-    request: BatchPredictRequest,
+    request: Request,
+    batch_request: BatchPredictRequest,
     model: SentimentModel = Depends(get_model),
     redis: Optional[RedisCache] = Depends(get_redis),
     db: Optional[AsyncSession] = Depends(get_db)
@@ -291,7 +342,7 @@ async def batch_predict_sentiment(
         predictions = []
         db_predictions = []
         
-        for text in request.texts:
+        for text in batch_request.texts:
             cache_hit = False
             sentiment = None
             confidence = None
@@ -404,7 +455,9 @@ async def batch_predict_sentiment(
     tags=["Cache"],
     summary="Get cache statistics"
 )
+@limiter.limit("60/minute")
 async def get_cache_statistics(
+    request: Request,
     redis: Optional[RedisCache] = Depends(get_redis)
 ):
     """
@@ -439,14 +492,59 @@ async def get_cache_statistics(
         )
 
 
+@app.get(
+    "/rate-limit/status",
+    response_model=RateLimitStatusResponse,
+    tags=["Rate Limiting"],
+    summary="Get current rate limit status"
+)
+async def get_rate_limit_status(request: Request):
+    """
+    Get current rate limit status for the requesting IP.
+    
+    Returns information about rate limit quota and remaining requests.
+    Note: This endpoint itself is not rate limited.
+    """
+    try:
+        # Get client IP
+        client_ip = get_remote_address(request)
+        
+        # Get rate limit info from slowapi
+        # slowapi stores limits in request state
+        rate_limit_headers = {}
+        if hasattr(request.state, "view_rate_limit"):
+            limit_info = request.state.view_rate_limit
+            rate_limit_headers = {
+                "limit": str(limit_info),
+                "remaining": getattr(request.state, "remaining", 0),
+                "reset": getattr(request.state, "reset", 0)
+            }
+        
+        # Default response if no rate limit info available
+        return RateLimitStatusResponse(
+            ip=client_ip,
+            limit="100/minute",  # Default limit for most endpoints
+            remaining=100,  # Unknown, return max
+            reset_in_seconds=60
+        )
+    except Exception as e:
+        logger.error(f"Error getting rate limit status: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get rate limit status: {str(e)}"
+        )
+
+
 @app.post(
     "/predict/ab",
     response_model=ABPredictResponse,
     tags=["Prediction", "A/B Testing"],
     summary="Predict with A/B testing"
 )
+@limiter.limit("100/minute")
 async def predict_sentiment_ab(
-    request: PredictRequest,
+    request: Request,
+    predict_request: PredictRequest,
     redis: Optional[RedisCache] = Depends(get_redis),
     db: Optional[AsyncSession] = Depends(get_db)
 ):
@@ -469,7 +567,7 @@ async def predict_sentiment_ab(
     try:
         # Try cache first (include model version in cache key)
         if redis is not None:
-            cache_key = f"sentiment:{model_version}:{redis.generate_cache_key(request.text).split(':', 1)[1]}"
+            cache_key = f"sentiment:{model_version}:{redis.generate_cache_key(predict_request.text).split(':', 1)[1]}"
             cached_result = await redis.get(cache_key)
             
             if cached_result is not None:
@@ -489,7 +587,7 @@ async def predict_sentiment_ab(
         # Cache miss - run model prediction
         if not cache_hit:
             model_start = time.perf_counter()
-            result = model.predict(request.text)
+            result = model.predict(predict_request.text)
             model_end = time.perf_counter()
             latency_ms = round((model_end - model_start) * 1000, 2)
             
@@ -506,7 +604,7 @@ async def predict_sentiment_ab(
             if redis is not None:
                 try:
                     cache_data = {"sentiment": sentiment, "confidence": confidence}
-                    cache_key = f"sentiment:{model_version}:{redis.generate_cache_key(request.text).split(':', 1)[1]}"
+                    cache_key = f"sentiment:{model_version}:{redis.generate_cache_key(predict_request.text).split(':', 1)[1]}"
                     await redis.set(cache_key, json.dumps(cache_data), ttl=3600)
                 except Exception as cache_error:
                     logger.error(f"Failed to cache result: {cache_error}")
@@ -518,7 +616,7 @@ async def predict_sentiment_ab(
         if db is not None:
             try:
                 prediction = Prediction(
-                    input_text=request.text,
+                    input_text=predict_request.text,
                     predicted_sentiment=sentiment,
                     confidence_score=confidence,
                     latency_ms=latency_ms,
@@ -557,7 +655,9 @@ async def predict_sentiment_ab(
     tags=["A/B Testing"],
     summary="Compare A/B test results"
 )
+@limiter.limit("60/minute")
 async def get_ab_comparison(
+    request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """

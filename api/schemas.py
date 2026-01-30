@@ -251,6 +251,24 @@ class CacheStatsResponse(BaseModel):
         }
 
 
+class RateLimitStatusResponse(BaseModel):
+    """Response schema for rate limit status"""
+    ip: str = Field(..., description="Client IP address")
+    limit: str = Field(..., description="Rate limit (e.g., '100/minute')")
+    remaining: int = Field(..., ge=0, description="Requests remaining in current window")
+    reset_in_seconds: int = Field(..., ge=0, description="Seconds until rate limit resets")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "ip": "127.0.0.1",
+                "limit": "100/minute",
+                "remaining": 75,
+                "reset_in_seconds": 45
+            }
+        }
+
+
 class ABPredictResponse(PredictResponse):
     """Response schema for A/B test predictions"""
     model_version: str = Field(..., description="Model version used (v1/v2)")

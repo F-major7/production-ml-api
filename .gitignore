@@ -41,6 +41,11 @@ htmlcov/
 *.swo
 *~
 
+# Backup files
+*.bak
+*.backup
+*.tmp
+
 # Logs
 *.log
 

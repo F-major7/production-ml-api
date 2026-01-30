@@ -1,11 +1,13 @@
 """
 Analytics endpoints for prediction data
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import List, Optional
 import logging
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from db.database import get_db
 from db.models import Prediction
@@ -16,6 +18,9 @@ from api.schemas import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Initialize rate limiter for analytics
+limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter(
     prefix="/analytics",
@@ -28,7 +33,9 @@ router = APIRouter(
     response_model=AnalyticsSummaryResponse,
     summary="Get overall prediction statistics"
 )
+@limiter.limit("60/minute")
 async def get_analytics_summary(
+    request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -84,7 +91,9 @@ async def get_analytics_summary(
     response_model=SentimentDistributionResponse,
     summary="Get sentiment distribution counts"
 )
+@limiter.limit("60/minute")
 async def get_sentiment_distribution(
+    request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -133,7 +142,9 @@ async def get_sentiment_distribution(
     response_model=List[RecentPredictionResponse],
     summary="Get recent predictions"
 )
+@limiter.limit("60/minute")
 async def get_recent_predictions(
+    request: Request,
     limit: int = Query(default=100, ge=1, le=1000, description="Number of recent predictions to return"),
     db: AsyncSession = Depends(get_db)
 ):
