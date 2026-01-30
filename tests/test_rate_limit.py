@@ -221,7 +221,7 @@ def test_rate_limit_resets_after_window(client):
 def test_rate_limit_retry_after_header(client):
     """
     Test that 429 responses include Retry-After header.
-    
+
     Note: This test is expected to fail with TestClient because SlowAPI's
     rate limit headers are not properly propagated through Starlette's TestClient.
     In production (real HTTP requests), these headers are present.
