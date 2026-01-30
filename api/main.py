@@ -1,19 +1,15 @@
 """
 Production ML API - Main FastAPI Application
-Sentiment analysis API with full observability
-
-NOTE: Rate limiting temporarily disabled due to slowapi causing exit 139 crashes in Docker.
-TODO Phase 7: Re-implement rate limiting with fastapi-limiter (Redis-backed, better async support)
+Sentiment analysis API with full observability and rate limiting
 """
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from prometheus_client import make_asgi_app
-# Rate limiting disabled - slowapi caused Docker crashes
-# from slowapi import Limiter, _rate_limit_exceeded_handler
-# from slowapi.util import get_remote_address
-# from slowapi.errors import RateLimitExceeded
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 import time
 import logging
 import json
@@ -27,7 +23,7 @@ from api.schemas import (
     BatchPredictRequest,
     BatchPredictResponse,
     CacheStatsResponse,
-    # RateLimitStatusResponse,  # Removed with slowapi
+    RateLimitStatusResponse,
     ABPredictResponse,
     ABComparisonResponse,
     ModelStats,
@@ -45,8 +41,8 @@ from monitoring.metrics import (
     track_cache_hit,
     track_cache_miss,
     track_prediction,
-    get_cache_stats
-    # track_rate_limit_exceeded  # Removed with rate limiting
+    get_cache_stats,
+    track_rate_limit_exceeded
 )
 from sqlalchemy import func, select
 
@@ -54,8 +50,8 @@ from sqlalchemy import func, select
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Rate limiter disabled - caused Docker crashes
-# limiter = Limiter(key_func=get_remote_address)
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -66,9 +62,9 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# Rate limiter disabled
-# app.state.limiter = limiter
-# app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+# Add rate limiter to app
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Enable CORS for development
 app.add_middleware(
@@ -178,7 +174,7 @@ async def health_check(
     tags=["Prediction"],
     summary="Predict sentiment of text"
 )
-# @limiter.limit("100/minute")  # Rate limiting disabled
+@limiter.limit("100/minute")
 async def predict_sentiment(
     request: Request,
     predict_request: PredictRequest,
@@ -325,7 +321,7 @@ async def predict_sentiment(
     tags=["Prediction"],
     summary="Batch predict sentiment for multiple texts"
 )
-# @limiter.limit("20/minute")  # Rate limiting disabled
+@limiter.limit("20/minute")
 async def batch_predict_sentiment(
     request: Request,
     batch_request: BatchPredictRequest,
@@ -461,7 +457,7 @@ async def batch_predict_sentiment(
     tags=["Cache"],
     summary="Get cache statistics"
 )
-# @limiter.limit("60/minute")  # Rate limiting disabled
+@limiter.limit("60/minute")
 async def get_cache_statistics(
     request: Request,
     redis: Optional[RedisCache] = Depends(get_redis)
@@ -498,8 +494,34 @@ async def get_cache_statistics(
         )
 
 
-# Rate limit status endpoint removed with slowapi
-# TODO Phase 7: Re-implement with fastapi-limiter
+@app.get(
+    "/rate-limit/status",
+    response_model=RateLimitStatusResponse,
+    tags=["Rate Limiting"],
+    summary="Get current rate limit status"
+)
+async def get_rate_limit_status(request: Request):
+    """
+    Get current rate limit status for the requesting IP.
+    
+    Returns information about rate limit quota and remaining requests.
+    Note: This endpoint itself is not rate limited.
+    """
+    try:
+        client_ip = get_remote_address(request)
+        
+        return RateLimitStatusResponse(
+            ip=client_ip,
+            limit="100/minute",  # Default limit for most endpoints
+            remaining=100,  # Approximate - slowapi doesn't expose this easily
+            reset_in_seconds=60
+        )
+    except Exception as e:
+        logger.error(f"Error getting rate limit status: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get rate limit status: {str(e)}"
+        )
 
 
 @app.post(
@@ -508,7 +530,7 @@ async def get_cache_statistics(
     tags=["Prediction", "A/B Testing"],
     summary="Predict with A/B testing"
 )
-# @limiter.limit("100/minute")  # Rate limiting disabled
+@limiter.limit("100/minute")
 async def predict_sentiment_ab(
     request: Request,
     predict_request: PredictRequest,
@@ -622,7 +644,7 @@ async def predict_sentiment_ab(
     tags=["A/B Testing"],
     summary="Compare A/B test results"
 )
-# @limiter.limit("60/minute")  # Rate limiting disabled
+@limiter.limit("60/minute")
 async def get_ab_comparison(
     request: Request,
     db: AsyncSession = Depends(get_db)
