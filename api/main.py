@@ -115,10 +115,12 @@ async def health_check(
     is_healthy = True
     
     try:
-        # Check model
-        model = SentimentModel()
-        health_status["model_loaded"] = model.is_loaded
-        if not model.is_loaded:
+        # Check model - verify it exists in instances without creating new one
+        health_status["model_loaded"] = (
+            "v1" in SentimentModel._instances and 
+            SentimentModel._instances["v1"].is_loaded
+        )
+        if not health_status["model_loaded"]:
             is_healthy = False
         
         # Check database
@@ -773,12 +775,15 @@ async def general_exception_handler(request: Request, exc: Exception):
 # Startup event
 @app.on_event("startup")
 async def startup_event():
-    """Initialize model and database on startup"""
+    """Initialize models and database on startup"""
     logger.info("Starting Production ML API...")
     try:
-        # Load ML model
-        model = SentimentModel()
-        logger.info(f"Model loaded: {model.is_loaded}")
+        # Eagerly load both model versions at startup
+        logger.info("Preloading models...")
+        model_v1 = SentimentModel.get_model("v1")
+        model_v2 = SentimentModel.get_model("v2")
+        logger.info(f"Model v1 loaded: {model_v1.is_loaded}")
+        logger.info(f"Model v2 loaded: {model_v2.is_loaded}")
         
         # Initialize database tables
         try:
