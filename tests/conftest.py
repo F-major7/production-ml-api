@@ -21,9 +21,22 @@ from api.dependencies import get_redis
 
 # Set test environment variables
 os.environ["REDIS_URL"] = "redis://localhost:6379/0"
+os.environ["TESTING"] = "1"  # Disable rate limiting for all tests
 
 # Test database URL (using SQLite for testing)
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+
+
+@pytest.fixture(scope="session", autouse=True)
+def set_testing_env():
+    """
+    Automatically set TESTING=1 environment variable for all tests.
+    This disables rate limiting to prevent 429 errors during test execution.
+    """
+    os.environ["TESTING"] = "1"
+    yield
+    # Cleanup after all tests
+    os.environ.pop("TESTING", None)
 
 
 @pytest.fixture(scope="session")
