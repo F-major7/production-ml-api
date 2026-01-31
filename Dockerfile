@@ -57,5 +57,6 @@ EXPOSE 8000
 #     CMD curl -f http://localhost:8000/health || exit 1
 
 # Run application with asyncio loop (NOT uvloop - causes PyTorch segfaults in Docker)
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--loop", "asyncio"]
+# Use PORT env var for Railway compatibility (defaults to 8000 for local)
+CMD sh -c "uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000} --loop asyncio"
 

@@ -1,0 +1,10 @@
+tests/
+htmlcov/
+.pytest_cache/
+loadtest/
+*.pyc
+__pycache__/
+.git/
+docs/
+monitoring/grafana-*.json
+
