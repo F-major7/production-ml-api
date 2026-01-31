@@ -1,0 +1,42 @@
+services:
+  # Main API service
+  - type: web
+    name: production-ml-api
+    env: docker
+    dockerfilePath: ./Dockerfile
+    region: oregon
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mlapi-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: mlapi-redis
+          type: redis
+          property: connectionString
+      - key: LOG_LEVEL
+        value: INFO
+      - key: RATE_LIMIT_PREDICT
+        value: 100/minute
+      - key: RATE_LIMIT_BATCH
+        value: 20/minute
+      - key: RATE_LIMIT_ANALYTICS
+        value: 60/minute
+      - key: RATE_LIMIT_AB
+        value: 100/minute
+      - key: PORT
+        value: 10000
+    healthCheckPath: /health
+
+databases:
+  - name: mlapi-db
+    databaseName: mlapi
+    plan: free
+    region: oregon
+
+  - name: mlapi-redis
+    plan: free
+    region: oregon
+
