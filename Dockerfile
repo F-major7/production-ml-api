@@ -58,5 +58,5 @@ EXPOSE 8000
 
 # Run application with asyncio loop (NOT uvloop - causes PyTorch segfaults in Docker)
 # Use PORT env var for Railway compatibility (defaults to 8000 for local)
-CMD sh -c "uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000} --loop asyncio"
+CMD ["sh", "-c", "uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000} --loop asyncio"]
 

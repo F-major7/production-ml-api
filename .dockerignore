@@ -67,3 +67,25 @@ docker-compose.yml
 # Model cache (will be downloaded in container)
 models/.cache/
 
+# Load testing (not needed in production)
+loadtest/
+
+# CI/CD (not needed in container)
+.github/
+
+# Pre-commit hooks
+.pre-commit-config.yaml
+
+# Coverage reports
+.coverage
+htmlcov/
+
+# Crash logs
+crash_log.txt
+*.log
+
+# Railway config (not needed inside container)
+railway.toml
+Procfile
+.railwayignore
+
